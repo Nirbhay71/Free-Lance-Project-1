@@ -4,14 +4,28 @@ import cookieParser from "cookie-parser"
 
 const app = express()
 
-const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(",").map(o => o.trim())
-    : ["*"];
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://free-lance-project-1-gamma.vercel.app"
+];
+if (process.env.CORS_ORIGIN) {
+    process.env.CORS_ORIGIN.split(",").forEach(o => {
+        const trimmed = o.trim();
+        if (!allowedOrigins.includes(trimmed)) {
+            allowedOrigins.push(trimmed);
+        }
+    });
+}
 
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+        
+        const isLocalhost = origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+        const isVercel = origin.endsWith(".vercel.app");
+        const isAllowed = allowedOrigins.includes(origin);
+
+        if (isLocalhost || isVercel || isAllowed) {
             callback(null, true);
         } else {
             callback(new Error("Not allowed by CORS"));
