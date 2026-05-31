@@ -3,6 +3,7 @@ import mongoose from "mongoose"
 const ItemSchema = new mongoose.Schema({
     color : {
         type : String,
+        enum : ["gold", "rose gold", "black"],
         required : true,
     },
     size_length : {

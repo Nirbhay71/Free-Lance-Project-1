@@ -17,6 +17,22 @@ const Reports = () => {
     // Loaded reports data
     const [reportData, setReportData] = useState(null);
     const [loading, setLoading] = useState(false);
+
+    const formatDateTime = (dateString) => {
+        if (!dateString) return "";
+        const d = new Date(dateString);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        let hours = d.getHours();
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        
+        return `${hours}:${minutes} ${ampm} ${day}/${month}/${year}`;
+    };
+
     const [error, setError] = useState("");
 
     // Load available parties for single party selection dropdown
@@ -317,7 +333,7 @@ const Reports = () => {
                                                 </div>
                                                 {item.outgoingDate && (
                                                     <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                                                        Outgoing: <strong>{new Date(item.outgoingDate).toLocaleDateString()}</strong>
+                                                        Outgoing: <strong>{formatDateTime(item.outgoingDate)}</strong>
                                                     </div>
                                                 )}
                                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>

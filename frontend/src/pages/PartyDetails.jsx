@@ -52,6 +52,47 @@ const PartyDetails = ({ partyName, onBack }) => {
         price: ""
     });
 
+    const formatDateTime = (dateString) => {
+        if (!dateString) return "";
+        const d = new Date(dateString);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        let hours = d.getHours();
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        
+        return `${hours}:${minutes} ${ampm} ${day}/${month}/${year}`;
+    };
+
+    const handleOutgoingClick = async (item) => {
+        setError("");
+        setSuccess("");
+        try {
+            let targetDate = null;
+            if (!item.outgoingDate) {
+                targetDate = new Date().toISOString();
+            } else {
+                if (!window.confirm("Do you want to clear the dispatch / outgoing date?")) {
+                    return;
+                }
+            }
+            const res = await API.patch(`/items/outgoing-date/${item._id}`, { outgoingDate: targetDate });
+            if (res.data?.success) {
+                if (targetDate) {
+                    setSuccess("Item marked as dispatched!");
+                } else {
+                    setSuccess("Cleared dispatch date!");
+                }
+                fetchItems();
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || "Failed to update outgoing date");
+        }
+    };
+
     const fetchItems = async () => {
         try {
             setLoading(true);
@@ -198,6 +239,10 @@ const PartyDetails = ({ partyName, onBack }) => {
     };
 
     const handleToggleAction = (item, type) => {
+        if (type === "outgoing") {
+            handleOutgoingClick(item);
+            return;
+        }
         if (activeActionId === item._id && actionType === type) {
             // Close if clicked again
             setActiveActionId(null);
@@ -213,12 +258,10 @@ const PartyDetails = ({ partyName, onBack }) => {
                     size_length: item.size_length,
                     size_width: item.size_width,
                     price: item.price,
-                    outgoingDate: item.outgoingDate ? new Date(item.outgoingDate).toISOString().split('T')[0] : "",
+                    outgoingDate: item.outgoingDate ? new Date(new Date(item.outgoingDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "",
                     quantityCompleted: item.quantityCompleted || 0,
                     quantityRejected: item.quantityRejected || 0
                 });
-            } else if (type === "outgoing") {
-                setActionValue(item.outgoingDate ? new Date(item.outgoingDate).toISOString().split('T')[0] : "");
             }
         }
     };
@@ -311,9 +354,9 @@ const PartyDetails = ({ partyName, onBack }) => {
                 updated = true;
             }
             
-            const itemOutgoingYMD = item.outgoingDate ? new Date(item.outgoingDate).toISOString().split('T')[0] : "";
-            if (editInputs.outgoingDate !== itemOutgoingYMD) {
-                await API.patch(`/items/outgoing-date/${item._id}`, { outgoingDate: editInputs.outgoingDate || null });
+            const itemOutgoingLocalDT = item.outgoingDate ? new Date(new Date(item.outgoingDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+            if (editInputs.outgoingDate !== itemOutgoingLocalDT) {
+                await API.patch(`/items/outgoing-date/${item._id}`, { outgoingDate: editInputs.outgoingDate ? new Date(editInputs.outgoingDate).toISOString() : null });
                 updated = true;
             }
 
@@ -415,27 +458,64 @@ const PartyDetails = ({ partyName, onBack }) => {
                         Upload New Production Item
                     </h3>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Color</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="Red, Blue, etc."
-                                value={color}
-                                onChange={(e) => setColor(e.target.value)}
-                            />
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Color</label>
+                        <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "4px" }}>
+                            {["gold", "rose gold", "black"].map((option) => {
+                                const isSelected = color === option;
+                                return (
+                                    <label 
+                                        key={option} 
+                                        style={{
+                                            flex: 1,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            gap: "8px",
+                                            padding: "10px 4px",
+                                            borderRadius: "var(--radius-sm)",
+                                            border: `1px solid ${isSelected ? "var(--accent-light)" : "var(--border-color)"}`,
+                                            background: isSelected ? "rgba(139, 92, 246, 0.08)" : "#f8fafc",
+                                            color: isSelected ? "var(--accent-light)" : "var(--text-secondary)",
+                                            fontWeight: isSelected ? "600" : "500",
+                                            cursor: "pointer",
+                                            transition: "all var(--transition-fast)",
+                                            boxShadow: isSelected ? "var(--shadow-sm), 0 0 0 2px rgba(139, 92, 246, 0.2)" : "none",
+                                            userSelect: "none"
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="color"
+                                            value={option}
+                                            checked={isSelected}
+                                            onChange={() => setColor(option)}
+                                            style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+                                        />
+                                        <div style={{
+                                            width: "12px",
+                                            height: "12px",
+                                            borderRadius: "50%",
+                                            border: option === "gold" ? "1px solid #d4af37" : (option === "rose gold" ? "1px solid #b76e79" : "1px solid #000"),
+                                            background: option === "gold" ? "#ffd700" : (option === "rose gold" ? "#b76e79" : "#000000"),
+                                            boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+                                            flexShrink: 0
+                                        }}></div>
+                                        <span style={{ fontSize: "13px", textTransform: "capitalize" }}>{option}</span>
+                                    </label>
+                                );
+                            })}
                         </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Price (per Sq. Ft)</label>
-                            <input
-                                type="number"
-                                className="form-input"
-                                placeholder="₹ Price"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                            />
-                        </div>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Price (per Sq. Ft)</label>
+                        <input
+                            type="number"
+                            className="form-input"
+                            placeholder="₹ Price"
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                        />
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
@@ -655,9 +735,12 @@ const PartyDetails = ({ partyName, onBack }) => {
                                         <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
                                             Dimensions: <strong>{item.size_length}L × {item.size_width}W</strong> inches
                                         </div>
-                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                                                                 <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                             Entry Time: <strong>{formatDateTime(item.createdAt)}</strong>
+                                         </div>
+<div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                                             Outgoing Date: <strong style={{ color: item.outgoingDate ? "var(--success)" : "var(--warning)" }}>
-                                                {item.outgoingDate ? new Date(item.outgoingDate).toLocaleDateString() : "Not Dispatched"}
+                                                {item.outgoingDate ? formatDateTime(item.outgoingDate) : "Not Dispatched"}
                                             </strong>
                                         </div>
 
@@ -822,36 +905,62 @@ const PartyDetails = ({ partyName, onBack }) => {
                                             </>
                                         )}
 
-                                        {actionType === "outgoing" && (
-                                            <>
-                                                <div style={{ fontSize: "13px", fontWeight: "600", textAlign: "left" }}>Set Outgoing Date (Dispatch Item)</div>
-                                                <div style={{ display: "flex", gap: "8px" }}>
-                                                    <input 
-                                                        type="date" 
-                                                        className="form-input" 
-                                                        value={actionValue}
-                                                        onChange={(e) => setActionValue(e.target.value)}
-                                                        style={{ padding: "8px 12px", height: "38px" }}
-                                                    />
-                                                    <button onClick={() => handleApplyAction(item)} className="btn btn-primary" style={{ height: "38px", minHeight: "38px", padding: "0 14px" }}>
-                                                        Save
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
+                                        
 
                                         {actionType === "edit" && (
                                             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                                                 <div style={{ fontSize: "13px", fontWeight: "600", textAlign: "left" }}>Edit Item Details</div>
-                                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                                                    <input 
-                                                        type="text" 
-                                                        className="form-input" 
-                                                        placeholder="Color"
-                                                        value={editInputs.color}
-                                                        onChange={(e) => setEditInputs({...editInputs, color: e.target.value})}
-                                                        style={{ padding: "8px 12px", height: "38px" }}
-                                                    />
+                                                <div style={{ display: "flex", flexDirection: "column", gap: "4px", textAlign: "left" }}>
+                                                    <label style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: "600" }}>Color</label>
+                                                    <div style={{ display: "flex", gap: "8px", width: "100%", marginTop: "2px" }}>
+                                                        {["gold", "rose gold", "black"].map((option) => {
+                                                            const isSelected = editInputs.color === option;
+                                                            return (
+                                                                <label 
+                                                                    key={option} 
+                                                                    style={{
+                                                                        flex: 1,
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        justifyContent: "center",
+                                                                        gap: "6px",
+                                                                        padding: "8px 4px",
+                                                                        borderRadius: "var(--radius-sm)",
+                                                                        border: `1px solid ${isSelected ? "var(--accent-light)" : "var(--border-color)"}`,
+                                                                        background: isSelected ? "rgba(139, 92, 246, 0.08)" : "#f8fafc",
+                                                                        color: isSelected ? "var(--accent-light)" : "var(--text-secondary)",
+                                                                        fontWeight: isSelected ? "600" : "500",
+                                                                        cursor: "pointer",
+                                                                        transition: "all var(--transition-fast)",
+                                                                        boxShadow: isSelected ? "var(--shadow-sm), 0 0 0 2px rgba(139, 92, 246, 0.2)" : "none",
+                                                                        userSelect: "none"
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="editColor"
+                                                                        value={option}
+                                                                        checked={isSelected}
+                                                                        onChange={() => setEditInputs({...editInputs, color: option})}
+                                                                        style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+                                                                    />
+                                                                    <div style={{
+                                                                        width: "10px",
+                                                                        height: "10px",
+                                                                        borderRadius: "50%",
+                                                                        border: option === "gold" ? "1px solid #d4af37" : (option === "rose gold" ? "1px solid #b76e79" : "1px solid #000"),
+                                                                        background: option === "gold" ? "#ffd700" : (option === "rose gold" ? "#b76e79" : "#000000"),
+                                                                        boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+                                                                        flexShrink: 0
+                                                                    }}></div>
+                                                                    <span style={{ fontSize: "11px", textTransform: "capitalize" }}>{option}</span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: "flex", flexDirection: "column", gap: "4px", textAlign: "left" }}>
+                                                    <label style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: "600" }}>Price (per Sq. Ft)</label>
                                                     <input 
                                                         type="number" 
                                                         className="form-input" 
@@ -904,7 +1013,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                                  </div>
                                                     <label style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Outgoing Date</label>
                                                     <input 
-                                                        type="date" 
+                                                        type="datetime-local" 
                                                         className="form-input" 
                                                         value={editInputs.outgoingDate || ""}
                                                         onChange={(e) => setEditInputs({...editInputs, outgoingDate: e.target.value})}

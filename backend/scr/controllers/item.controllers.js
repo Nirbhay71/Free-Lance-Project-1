@@ -46,6 +46,12 @@ const addNewItem = asyncHandler(async (req, res)=>{
         throw new ApiError(400, 'No Item Details Provided')
     }
 
+    const normalizedColor = String(color).trim().toLowerCase();
+    const allowedColors = ["gold", "rose gold", "black"];
+    if (!allowedColors.includes(normalizedColor)) {
+        throw new ApiError(400, "Invalid color option. Must be gold, rose gold, or black.");
+    }
+
     const photoLocalPath = req.file?.path;
 
     if(!photoLocalPath){
@@ -59,7 +65,7 @@ const addNewItem = asyncHandler(async (req, res)=>{
     }
 
     const item = await Item.create({
-        color,
+        color: normalizedColor,
         price,
         quantityArrived,
         size_length,
@@ -304,12 +310,18 @@ const updateColor = asyncHandler(async (req, res)=>{
         throw new ApiError(400, "No Color Provided")
     }
 
+    const normalizedColor = String(color).trim().toLowerCase();
+    const allowedColors = ["gold", "rose gold", "black"];
+    if (!allowedColors.includes(normalizedColor)) {
+        throw new ApiError(400, "Invalid color option. Must be gold, rose gold, or black.");
+    }
+
     const item 	= await Item.findByIdAndUpdate(
         itemId,
         {
-            $set : {color : color}
+            $set : {color : normalizedColor}
         },
-        {new : true}
+        {new : true, runValidators: true}
     )
 
     if(!item){

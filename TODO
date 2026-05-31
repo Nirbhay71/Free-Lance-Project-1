@@ -1,1 +1,5 @@
-3. Need to check wheather this upload photo wil work on mobile phone or not
+// 1. color should be in the radio button
+// 2. add dispatch button insed of selecting the dispatch date
+// 3. Party name is not changing
+// 4. also look for the colors in selection bar
+// 5. data formate should be minute:hour am pm day/month/year 
