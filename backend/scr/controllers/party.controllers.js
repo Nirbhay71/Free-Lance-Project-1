@@ -70,7 +70,8 @@ const createNewParty = asyncHandler(async (req, res) => {
 })
 
 const updatePartyName = asyncHandler(async (req, res) => {
-    const { oldname, newName } = req.body;
+    const oldname = req.body.oldName || req.body.oldname;
+    const { newName } = req.body;
 
     if (!oldname || !newName) {
         throw new ApiError(400, "Old name and new name are required")

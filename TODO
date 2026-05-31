@@ -1,5 +1,5 @@
-// 1. color should be in the radio button
-// 2. add dispatch button insed of selecting the dispatch date
+// 1. color should be in the radio button //Done
+// 2. add dispatch button insed of selecting the dispatch date  // Done
 // 3. Party name is not changing
 // 4. also look for the colors in selection bar
-// 5. data formate should be minute:hour am pm day/month/year 
+// 5. data formate should be minute:hour am pm day/month/year // Done
