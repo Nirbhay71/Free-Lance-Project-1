@@ -644,7 +644,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                             borderRadius: "20px",
                             border: "1px solid",
                             borderColor: filterTab === tab.id ? "var(--accent-light)" : "var(--border-color)",
-                            background: filterTab === tab.id ? "rgba(139,92,246,0.15)" : "rgba(15,23,42,0.4)",
+                            background: filterTab === tab.id ? "rgba(139,92,246,0.15)" : "var(--bg-secondary)",
                             color: filterTab === tab.id ? "var(--accent-light)" : "var(--text-secondary)",
                             fontSize: "13px",
                             fontWeight: "600",
@@ -770,7 +770,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                     display: "flex", 
                                     justifyContent: "space-between", 
                                     fontSize: "13px", 
-                                    background: "rgba(15,23,42,0.3)", 
+                                    background: "var(--bg-secondary)", 
                                     padding: "8px 12px", 
                                     borderRadius: "var(--radius-sm)" 
                                 }}>
@@ -841,7 +841,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                 {/* Expanded form section for action buttons */}
                                 {activeActionId === item._id && (
                                     <div className="glass-panel animate-fade-in" style={{
-                                        background: "rgba(15,23,42,0.6)",
+                                        background: "var(--bg-secondary)",
                                         padding: "12px",
                                         marginTop: "8px",
                                         display: "flex",
@@ -1089,7 +1089,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    background: "rgba(10, 15, 30, 0.96)",
+                    background: "rgba(248, 250, 252, 0.98)",
                     backdropFilter: "blur(12px)",
                     zIndex: 1000,
                     display: "flex",
@@ -1121,7 +1121,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                 setReportError("");
                             }} 
                             style={{
-                                background: "rgba(255,255,255,0.08)",
+                                background: "var(--bg-secondary)",
                                 border: "none",
                                 borderRadius: "50%",
                                 width: "36px",
@@ -1222,7 +1222,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                 flexDirection: "column", 
                                 gap: "16px",
                                 padding: "16px 12px",
-                                background: "#0a0f1e",
+                                background: "var(--bg-secondary)",
                                 borderRadius: "8px"
                             }}>
                                 {/* Period Title */}

@@ -112,7 +112,7 @@ const Reports = () => {
             {/* Config Panel */}
             <div className="glass-panel" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
                 {/* Switch between Single or All Parties */}
-                <div style={{ display: "flex", background: "rgba(15,23,42,0.4)", borderRadius: "var(--radius-sm)", padding: "4px" }}>
+                <div style={{ display: "flex", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", padding: "4px" }}>
                     <button
                         onClick={() => setReportType("all")}
                         style={{
@@ -120,8 +120,8 @@ const Reports = () => {
                             padding: "8px",
                             border: "none",
                             borderRadius: "4px",
-                            background: reportType === "all" ? "var(--accent)" : "none",
-                            color: "white",
+                            background: reportType === "all" ? "var(--accent)" : "transparent",
+                            color: reportType === "all" ? "white" : "var(--text-secondary)",
                             fontWeight: "600",
                             fontSize: "13px",
                             cursor: "pointer",
@@ -137,8 +137,8 @@ const Reports = () => {
                             padding: "8px",
                             border: "none",
                             borderRadius: "4px",
-                            background: reportType === "single" ? "var(--accent)" : "none",
-                            color: "white",
+                            background: reportType === "single" ? "var(--accent)" : "transparent",
+                            color: reportType === "single" ? "white" : "var(--text-secondary)",
                             fontWeight: "600",
                             fontSize: "13px",
                             cursor: "pointer",
@@ -157,7 +157,7 @@ const Reports = () => {
                             className="form-input" 
                             value={month} 
                             onChange={(e) => setMonth(e.target.value)}
-                            style={{ height: "46px", padding: "8px 12px", background: "rgba(15,23,42,0.6)" }}
+                            style={{ height: "46px", padding: "8px 12px", background: "var(--bg-primary)" }}
                         >
                             {monthsList.map((mName, idx) => (
                                 <option key={idx} value={idx + 1} style={{ background: "var(--bg-secondary)" }}>{mName}</option>
@@ -171,7 +171,7 @@ const Reports = () => {
                             className="form-input" 
                             value={year} 
                             onChange={(e) => setYear(e.target.value)}
-                            style={{ height: "46px", padding: "8px 12px", background: "rgba(15,23,42,0.6)" }}
+                            style={{ height: "46px", padding: "8px 12px", background: "var(--bg-primary)" }}
                         >
                             {[2025, 2026, 2027, 2028].map(yr => (
                                 <option key={yr} value={yr} style={{ background: "var(--bg-secondary)" }}>{yr}</option>
@@ -187,7 +187,7 @@ const Reports = () => {
                             className="form-input" 
                             value={selectedParty} 
                             onChange={(e) => setSelectedParty(e.target.value)}
-                            style={{ height: "46px", padding: "8px 12px", background: "rgba(15,23,42,0.6)" }}
+                            style={{ height: "46px", padding: "8px 12px", background: "var(--bg-primary)" }}
                         >
                             {parties.map(p => (
                                 <option key={p._id} value={p.partyName} style={{ background: "var(--bg-secondary)" }}>{p.partyName}</option>
