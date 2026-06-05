@@ -3,7 +3,7 @@ import API from "../api";
 import { 
     ArrowLeft, Plus, Image as ImageIcon, CheckCircle2, AlertTriangle, 
     DollarSign, Trash2, Camera, Sliders, ChevronDown, ChevronUp, Save, Eye, X,
-    BarChart3, Download, Calendar
+    BarChart3, Download, Calendar, Pencil
 } from "lucide-react";
 import html2pdf from "html2pdf.js";
 
@@ -25,6 +25,7 @@ const PartyDetails = ({ partyName, onBack }) => {
     
     // Add Item states
     const [showAddForm, setShowAddForm] = useState(false);
+    const [addFormStep, setAddFormStep] = useState(1); // 1 = photo step, 2 = details step
     const [color, setColor] = useState("");
     const [sizeLength, setSizeLength] = useState("");
     const [sizeWidth, setSizeWidth] = useState("");
@@ -33,10 +34,23 @@ const PartyDetails = ({ partyName, onBack }) => {
     const [photoFile, setPhotoFile] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
     const fileInputRef = useRef(null);
+    const cameraInputRef = useRef(null);
     const [addingItem, setAddingItem] = useState(false);
 
     // Modal Image Preview State
     const [previewImageUrl, setPreviewImageUrl] = useState(null);
+
+    // Payment Popup Modal State
+    const [paymentModalItem, setPaymentModalItem] = useState(null);
+    const [paymentModalValue, setPaymentModalValue] = useState("");
+
+    // Complete / Reject / Edit Popup Modal States
+    const [completeModalItem, setCompleteModalItem] = useState(null);
+    const [completeModalValue, setCompleteModalValue] = useState("");
+    const [rejectModalItem, setRejectModalItem] = useState(null);
+    const [rejectModalValue, setRejectModalValue] = useState("");
+    const [editModalItem, setEditModalItem] = useState(null);
+    const [editingFields, setEditingFields] = useState(new Set()); // which fields are unlocked
 
     // Active Action States for Item Cards
     // Structure: { [itemId]: 'complete' | 'reject' | 'payment' | 'edit' | null }
@@ -188,6 +202,7 @@ const PartyDetails = ({ partyName, onBack }) => {
         if (file) {
             setPhotoFile(file);
             setPhotoPreview(URL.createObjectURL(file));
+            setAddFormStep(2); // advance to detail fields after photo is chosen
         }
     };
 
@@ -220,6 +235,7 @@ const PartyDetails = ({ partyName, onBack }) => {
             if (response.data?.success) {
                 setSuccess("New item added to party database!");
                 setShowAddForm(false);
+                setAddFormStep(1);
                 // Reset fields
                 setColor("");
                 setSizeLength("");
@@ -424,7 +440,12 @@ const PartyDetails = ({ partyName, onBack }) => {
                 </button>
 
                 <button 
-                    onClick={() => setShowAddForm(!showAddForm)} 
+                    onClick={() => {
+                        setShowAddForm(!showAddForm);
+                        setAddFormStep(1);
+                        setPhotoFile(null);
+                        setPhotoPreview(null);
+                    }} 
                     className="btn btn-primary" 
                     style={{ height: "40px", minHeight: "40px", padding: "0 12px" }}
                 >
@@ -446,181 +467,312 @@ const PartyDetails = ({ partyName, onBack }) => {
                 </div>
             )}
 
-            {/* Add New Item Form Overlay / Accordion */}
+            {/* Add New Item Form — Two-Step Flow */}
             {showAddForm && (
-                <form onSubmit={handleAddItemSubmit} className="glass-panel glass-panel-glow animate-fade-in" style={{
-                    padding: "20px 16px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "16px"
-                }}>
-                    <h3 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: "16px", textAlign: "left" }}>
-                        Upload New Production Item
-                    </h3>
-
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Color</label>
-                        <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "4px" }}>
-                            {["gold", "rose gold", "black"].map((option) => {
-                                const isSelected = color === option;
-                                return (
-                                    <label 
-                                        key={option} 
-                                        style={{
-                                            flex: 1,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            gap: "8px",
-                                            padding: "10px 4px",
-                                            borderRadius: "var(--radius-sm)",
-                                            border: `1px solid ${isSelected ? "var(--accent-light)" : "var(--border-color)"}`,
-                                            background: isSelected ? "rgba(139, 92, 246, 0.08)" : "#f8fafc",
-                                            color: isSelected ? "var(--accent-light)" : "var(--text-secondary)",
-                                            fontWeight: isSelected ? "600" : "500",
-                                            cursor: "pointer",
-                                            transition: "all var(--transition-fast)",
-                                            boxShadow: isSelected ? "var(--shadow-sm), 0 0 0 2px rgba(139, 92, 246, 0.2)" : "none",
-                                            userSelect: "none"
-                                        }}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="color"
-                                            value={option}
-                                            checked={isSelected}
-                                            onChange={() => setColor(option)}
-                                            style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
-                                        />
-                                        <div style={{
-                                            width: "12px",
-                                            height: "12px",
-                                            borderRadius: "50%",
-                                            border: option === "gold" ? "1px solid #d4af37" : (option === "rose gold" ? "1px solid #b76e79" : "1px solid #000"),
-                                            background: option === "gold" ? "#ffd700" : (option === "rose gold" ? "#b76e79" : "#000000"),
-                                            boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
-                                            flexShrink: 0
-                                        }}></div>
-                                        <span style={{ fontSize: "13px", textTransform: "capitalize" }}>{option}</span>
-                                    </label>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Price (per Sq. Ft)</label>
-                        <input
-                            type="number"
-                            className="form-input"
-                            placeholder="₹ Price"
-                            value={price}
-                            onChange={(e) => setPrice(e.target.value)}
-                        />
+                <div className="glass-panel glass-panel-glow animate-fade-in" style={{ padding: "20px 16px" }}>
+                    {/* Step indicator */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                        <div style={{
+                            width: "24px", height: "24px", borderRadius: "50%",
+                            background: addFormStep >= 1 ? "var(--accent-light)" : "var(--border-color)",
+                            color: "#fff", fontSize: "12px", fontWeight: "700",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0
+                        }}>1</div>
+                        <div style={{ flex: 1, height: "2px", borderRadius: "2px", background: addFormStep >= 2 ? "var(--accent-light)" : "var(--border-color)", transition: "background 0.3s" }} />
+                        <div style={{
+                            width: "24px", height: "24px", borderRadius: "50%",
+                            background: addFormStep >= 2 ? "var(--accent-light)" : "var(--border-color)",
+                            color: addFormStep >= 2 ? "#fff" : "var(--text-secondary)", fontSize: "12px", fontWeight: "700",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0, transition: "background 0.3s, color 0.3s"
+                        }}>2</div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Length (in)</label>
-                            <input
-                                type="number"
-                                className="form-input"
-                                placeholder="L"
-                                value={sizeLength}
-                                onChange={(e) => setSizeLength(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Width (in)</label>
-                            <input
-                                type="number"
-                                className="form-input"
-                                placeholder="W"
-                                value={sizeWidth}
-                                onChange={(e) => setSizeWidth(e.target.value)}
-                            />
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">Quantity</label>
-                            <input
-                                type="number"
-                                className="form-input"
-                                placeholder="Arrived"
-                                value={quantityArrived}
-                                onChange={(e) => setQuantityArrived(e.target.value)}
-                            />
-                        </div>
-                    </div>
+                    {/* ── STEP 1: Photo Selection ── */}
+                    {addFormStep === 1 && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                            <div>
+                                <h3 style={{ margin: "0 0 4px", fontFamily: "var(--font-heading)", fontSize: "16px" }}>
+                                    Add Item Photo
+                                </h3>
+                                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)" }}>
+                                    Step 1 of 2 — Choose how to add the item photo
+                                </p>
+                            </div>
 
-                    {/* Camera / File upload field */}
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Item Photo</label>
-                        <div className="file-upload-wrapper">
-                            <Camera size={24} color="var(--accent-light)" style={{ marginBottom: "8px" }} />
-                            <span style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>
-                                {photoFile ? photoFile.name : "Capture Image / Upload Photo"}
-                            </span>
-                            <span style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "4px" }}>
-                                Tap to open mobile camera or gallery
-                            </span>
+                            {/* Hidden inputs */}
+                            {/* Camera capture */}
                             <input
                                 type="file"
                                 accept="image/*"
                                 capture="environment"
-                                className="file-upload-input"
+                                style={{ display: "none" }}
+                                onChange={handlePhotoChange}
+                                ref={cameraInputRef}
+                            />
+                            {/* Gallery picker */}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: "none" }}
                                 onChange={handlePhotoChange}
                                 ref={fileInputRef}
                             />
+
+                            {/* Take Photo button */}
+                            <button
+                                type="button"
+                                onClick={() => cameraInputRef.current?.click()}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "14px",
+                                    padding: "18px 16px",
+                                    borderRadius: "var(--radius-sm)",
+                                    border: "1.5px solid var(--accent-light)",
+                                    background: "rgba(139, 92, 246, 0.06)",
+                                    cursor: "pointer",
+                                    width: "100%",
+                                    textAlign: "left"
+                                }}
+                            >
+                                <div style={{
+                                    width: "44px", height: "44px", borderRadius: "50%",
+                                    background: "rgba(139, 92, 246, 0.15)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    flexShrink: 0
+                                }}>
+                                    <Camera size={22} color="var(--accent-light)" />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "2px" }}>
+                                        Take Photo
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                        Open camera and capture now
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Select from Library button */}
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "14px",
+                                    padding: "18px 16px",
+                                    borderRadius: "var(--radius-sm)",
+                                    border: "1.5px solid var(--border-color)",
+                                    background: "var(--bg-secondary)",
+                                    cursor: "pointer",
+                                    width: "100%",
+                                    textAlign: "left"
+                                }}
+                            >
+                                <div style={{
+                                    width: "44px", height: "44px", borderRadius: "50%",
+                                    background: "rgba(0,0,0,0.06)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    flexShrink: 0
+                                }}>
+                                    <ImageIcon size={22} color="var(--text-secondary)" />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-primary)", marginBottom: "2px" }}>
+                                        Select from Library
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                        Pick an existing photo from gallery
+                                    </div>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => {
+                                    setShowAddForm(false);
+                                    setAddFormStep(1);
+                                }}
+                            >
+                                Cancel
+                            </button>
                         </div>
-                        {photoPreview && (
-                            <div style={{ position: "relative", width: "100%", height: "150px", marginTop: "12px", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
-                                <img src={photoPreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    )}
+
+                    {/* ── STEP 2: Details Form ── */}
+                    {addFormStep === 2 && (
+                        <form onSubmit={handleAddItemSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                            <div>
+                                <h3 style={{ margin: "0 0 4px", fontFamily: "var(--font-heading)", fontSize: "16px" }}>
+                                    Item Details
+                                </h3>
+                                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)" }}>
+                                    Step 2 of 2 — Fill in the item information
+                                </p>
+                            </div>
+
+                            {/* Photo preview with retake option */}
+                            {photoPreview && (
+                                <div style={{ position: "relative", width: "100%", height: "160px", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
+                                    <img src={photoPreview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPhotoFile(null);
+                                            setPhotoPreview(null);
+                                            setAddFormStep(1);
+                                        }}
+                                        style={{
+                                            position: "absolute",
+                                            top: "8px",
+                                            right: "8px",
+                                            background: "rgba(0,0,0,0.65)",
+                                            border: "none",
+                                            borderRadius: "20px",
+                                            padding: "4px 10px",
+                                            color: "white",
+                                            fontSize: "11px",
+                                            fontWeight: "600",
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "4px"
+                                        }}
+                                    >
+                                        <Camera size={12} /> Retake
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Color */}
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Color</label>
+                                <div style={{ display: "flex", gap: "10px", width: "100%", marginTop: "4px" }}>
+                                    {["gold", "rose gold", "black"].map((option) => {
+                                        const isSelected = color === option;
+                                        return (
+                                            <label
+                                                key={option}
+                                                style={{
+                                                    flex: 1,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    gap: "8px",
+                                                    padding: "10px 4px",
+                                                    borderRadius: "var(--radius-sm)",
+                                                    border: `1px solid ${isSelected ? "var(--accent-light)" : "var(--border-color)"}`,
+                                                    background: isSelected ? "rgba(139, 92, 246, 0.08)" : "#f8fafc",
+                                                    color: isSelected ? "var(--accent-light)" : "var(--text-secondary)",
+                                                    fontWeight: isSelected ? "600" : "500",
+                                                    cursor: "pointer",
+                                                    transition: "all var(--transition-fast)",
+                                                    boxShadow: isSelected ? "var(--shadow-sm), 0 0 0 2px rgba(139, 92, 246, 0.2)" : "none",
+                                                    userSelect: "none"
+                                                }}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="color"
+                                                    value={option}
+                                                    checked={isSelected}
+                                                    onChange={() => setColor(option)}
+                                                    style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+                                                />
+                                                <div style={{
+                                                    width: "12px",
+                                                    height: "12px",
+                                                    borderRadius: "50%",
+                                                    border: option === "gold" ? "1px solid #d4af37" : (option === "rose gold" ? "1px solid #b76e79" : "1px solid #000"),
+                                                    background: option === "gold" ? "#ffd700" : (option === "rose gold" ? "#b76e79" : "#000000"),
+                                                    boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+                                                    flexShrink: 0
+                                                }}></div>
+                                                <span style={{ fontSize: "13px", textTransform: "capitalize" }}>{option}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Price */}
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Price (per Sq. Ft)</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    placeholder="₹ Price"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Dimensions + Quantity */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Length (in)</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        placeholder="L"
+                                        value={sizeLength}
+                                        onChange={(e) => setSizeLength(e.target.value)}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Width (in)</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        placeholder="W"
+                                        value={sizeWidth}
+                                        onChange={(e) => setSizeWidth(e.target.value)}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Quantity</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        placeholder="Arrived"
+                                        value={quantityArrived}
+                                        onChange={(e) => setQuantityArrived(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                                <button type="submit" className="btn btn-primary" style={{ flexGrow: 1 }} disabled={addingItem}>
+                                    {addingItem ? (
+                                        <div className="spinner" style={{ width: "20px", height: "20px", borderWidth: "2px" }}></div>
+                                    ) : "Upload and Save"}
+                                </button>
                                 <button
                                     type="button"
+                                    className="btn btn-secondary"
                                     onClick={() => {
+                                        setShowAddForm(false);
+                                        setAddFormStep(1);
                                         setPhotoFile(null);
                                         setPhotoPreview(null);
-                                    }}
-                                    style={{
-                                        position: "absolute",
-                                        top: "8px",
-                                        right: "8px",
-                                        background: "rgba(0,0,0,0.6)",
-                                        border: "none",
-                                        borderRadius: "50%",
-                                        width: "28px",
-                                        height: "28px",
-                                        color: "white",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center"
+                                        setColor("");
+                                        setSizeLength("");
+                                        setSizeWidth("");
+                                        setPrice("");
+                                        setQuantityArrived("");
                                     }}
                                 >
-                                    <X size={14} />
+                                    Cancel
                                 </button>
                             </div>
-                        )}
-                    </div>
-
-                    <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
-                        <button type="submit" className="btn btn-primary" style={{ flexGrow: 1 }} disabled={addingItem}>
-                            {addingItem ? (
-                                <div className="spinner" style={{ width: "20px", height: "20px", borderWidth: "2px" }}></div>
-                            ) : "Upload and Save"}
-                        </button>
-                        <button 
-                            type="button" 
-                            className="btn btn-secondary" 
-                            onClick={() => {
-                                setShowAddForm(false);
-                                setPhotoFile(null);
-                                setPhotoPreview(null);
-                            }}
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </form>
+                        </form>
+                    )}
+                </div>
             )}
 
             {/* Filter Tabs (Horizontal Scroll on Mobile) */}
@@ -791,7 +943,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                 {/* Action Buttons Panel (Quick triggers) */}
                                 <div style={{ display: "flex", gap: "6px", overflowX: "auto" }}>
                                     <button 
-                                        onClick={() => handleToggleAction(item, "complete")} 
+                                        onClick={() => { setCompleteModalItem(item); setCompleteModalValue(""); }} 
                                         className="btn btn-secondary" 
                                         style={{ height: "36px", minHeight: "36px", padding: "0 10px", flexGrow: 1, fontSize: "12px" }}
                                     >
@@ -799,7 +951,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                         Complete
                                     </button>
                                     <button 
-                                        onClick={() => handleToggleAction(item, "reject")} 
+                                        onClick={() => { setRejectModalItem(item); setRejectModalValue(""); }} 
                                         className="btn btn-secondary" 
                                         style={{ height: "36px", minHeight: "36px", padding: "0 10px", flexGrow: 1, fontSize: "12px" }}
                                     >
@@ -807,7 +959,10 @@ const PartyDetails = ({ partyName, onBack }) => {
                                         Reject
                                     </button>
                                     <button 
-                                        onClick={() => handleToggleAction(item, "payment")} 
+                                        onClick={() => {
+                                            setPaymentModalItem(item);
+                                            setPaymentModalValue("");
+                                        }} 
                                         className="btn btn-secondary" 
                                         style={{ height: "36px", minHeight: "36px", padding: "0 10px", flexGrow: 1, fontSize: "12px" }}
                                     >
@@ -823,7 +978,18 @@ const PartyDetails = ({ partyName, onBack }) => {
                                         Outgoing
                                     </button>
                                     <button 
-                                        onClick={() => handleToggleAction(item, "edit")} 
+                                        onClick={() => {
+                                            setEditModalItem(item);
+                                            setEditInputs({
+                                                color: item.color,
+                                                size_length: item.size_length,
+                                                size_width: item.size_width,
+                                                price: item.price,
+                                                outgoingDate: item.outgoingDate ? new Date(new Date(item.outgoingDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "",
+                                                quantityCompleted: item.quantityCompleted || 0,
+                                                quantityRejected: item.quantityRejected || 0
+                                            });
+                                        }} 
                                         className="btn btn-secondary" 
                                         style={{ height: "36px", minHeight: "36px", padding: "0 10px", fontSize: "12px" }}
                                     >
@@ -838,8 +1004,8 @@ const PartyDetails = ({ partyName, onBack }) => {
                                     </button>
                                 </div>
 
-                                {/* Expanded form section for action buttons */}
-                                {activeActionId === item._id && (
+                                {/* (inline action panels removed — now popup modals) */}
+                                {false && (
                                     <div className="glass-panel animate-fade-in" style={{
                                         background: "var(--bg-secondary)",
                                         padding: "12px",
@@ -881,25 +1047,6 @@ const PartyDetails = ({ partyName, onBack }) => {
                                                     />
                                                     <button onClick={() => handleApplyAction(item)} className="btn btn-danger" style={{ height: "38px", minHeight: "38px", padding: "0 14px" }}>
                                                         Reject
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {actionType === "payment" && (
-                                            <>
-                                                <div style={{ fontSize: "13px", fontWeight: "600", textAlign: "left" }}>Add Payment Received</div>
-                                                <div style={{ display: "flex", gap: "8px" }}>
-                                                    <input 
-                                                        type="number" 
-                                                        className="form-input" 
-                                                        placeholder="Amount in ₹" 
-                                                        value={actionValue}
-                                                        onChange={(e) => setActionValue(e.target.value)}
-                                                        style={{ padding: "8px 12px", height: "38px" }}
-                                                    />
-                                                    <button onClick={() => handleApplyAction(item)} className="btn btn-primary" style={{ height: "38px", minHeight: "38px", padding: "0 14px" }}>
-                                                        Record
                                                     </button>
                                                 </div>
                                             </>
@@ -1030,6 +1177,381 @@ const PartyDetails = ({ partyName, onBack }) => {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* ── Complete Popup Modal ── */}
+            {completeModalItem && (
+                <div onClick={() => setCompleteModalItem(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", background: "rgba(255,255,255,0.15)" }}>
+                    <div onClick={(e) => e.stopPropagation()} className="animate-fade-in" style={{ background: "var(--bg-primary)", borderRadius: "var(--radius-md)", boxShadow: "0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px var(--border-color)", padding: "28px 24px 24px", width: "100%", maxWidth: "380px", display: "flex", flexDirection: "column", gap: "18px", position: "relative" }}>
+                        <button onClick={() => setCompleteModalItem(null)} style={{ position: "absolute", top: "12px", right: "12px", background: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "32px", height: "32px", color: "var(--text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={15} /></button>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ width: "46px", height: "46px", borderRadius: "50%", background: "rgba(34,197,94,0.12)", border: "1.5px solid rgba(34,197,94,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <CheckCircle2 size={22} color="var(--success)" />
+                            </div>
+                            <div style={{ textAlign: "left" }}>
+                                <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", fontFamily: "var(--font-heading)" }}>Record Completed</div>
+                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>{completeModalItem.color} · Arrived: {completeModalItem.quantityArrived}</div>
+                            </div>
+                        </div>
+                        <div style={{ background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                            <span style={{ color: "var(--text-secondary)" }}>Already Completed</span>
+                            <strong style={{ color: "var(--success)" }}>{completeModalItem.quantityCompleted}</strong>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>Units Completed Now</label>
+                            <input type="number" className="form-input" placeholder="Number of units" value={completeModalValue} onChange={(e) => setCompleteModalValue(e.target.value)} autoFocus style={{ padding: "12px 14px", fontSize: "16px", height: "50px" }} />
+                        </div>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                            <button className="btn btn-primary" style={{ flexGrow: 1, height: "46px", fontSize: "14px", background: "var(--success)", borderColor: "var(--success)" }}
+                                onClick={async () => {
+                                    const val = Number(completeModalValue);
+                                    if (isNaN(val) || val <= 0) { setError("Enter a valid quantity."); return; }
+                                    if (completeModalItem.quantityCompleted + completeModalItem.quantityRejected + val > completeModalItem.quantityArrived) { setError("Total cannot exceed arrived quantity."); return; }
+                                    setError(""); setSuccess("");
+                                    try {
+                                        const res = await API.patch(`/items/completed/${completeModalItem._id}`, { quantityCompleted: val });
+                                        if (res.data?.success) { setSuccess(`Marked ${val} units as Completed!`); setCompleteModalItem(null); setCompleteModalValue(""); fetchItems(); }
+                                    } catch(err) { setError(err.response?.data?.message || "Operation failed."); }
+                                }}
+                            >Save Completed</button>
+                            <button className="btn btn-secondary" style={{ height: "46px", padding: "0 16px" }} onClick={() => setCompleteModalItem(null)}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Reject Popup Modal ── */}
+            {rejectModalItem && (
+                <div onClick={() => setRejectModalItem(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", background: "rgba(255,255,255,0.15)" }}>
+                    <div onClick={(e) => e.stopPropagation()} className="animate-fade-in" style={{ background: "var(--bg-primary)", borderRadius: "var(--radius-md)", boxShadow: "0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px var(--border-color)", padding: "28px 24px 24px", width: "100%", maxWidth: "380px", display: "flex", flexDirection: "column", gap: "18px", position: "relative" }}>
+                        <button onClick={() => setRejectModalItem(null)} style={{ position: "absolute", top: "12px", right: "12px", background: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "32px", height: "32px", color: "var(--text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={15} /></button>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ width: "46px", height: "46px", borderRadius: "50%", background: "rgba(239,68,68,0.12)", border: "1.5px solid rgba(239,68,68,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <AlertTriangle size={22} color="var(--danger)" />
+                            </div>
+                            <div style={{ textAlign: "left" }}>
+                                <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", fontFamily: "var(--font-heading)" }}>Record Rejected</div>
+                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>{rejectModalItem.color} · Arrived: {rejectModalItem.quantityArrived}</div>
+                            </div>
+                        </div>
+                        <div style={{ background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                            <span style={{ color: "var(--text-secondary)" }}>Already Rejected</span>
+                            <strong style={{ color: "var(--danger)" }}>{rejectModalItem.quantityRejected}</strong>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>Units Rejected Now</label>
+                            <input type="number" className="form-input" placeholder="Number of units" value={rejectModalValue} onChange={(e) => setRejectModalValue(e.target.value)} autoFocus style={{ padding: "12px 14px", fontSize: "16px", height: "50px" }} />
+                        </div>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                            <button className="btn btn-danger" style={{ flexGrow: 1, height: "46px", fontSize: "14px" }}
+                                onClick={async () => {
+                                    const val = Number(rejectModalValue);
+                                    if (isNaN(val) || val <= 0) { setError("Enter a valid quantity."); return; }
+                                    if (rejectModalItem.quantityCompleted + rejectModalItem.quantityRejected + val > rejectModalItem.quantityArrived) { setError("Total cannot exceed arrived quantity."); return; }
+                                    setError(""); setSuccess("");
+                                    try {
+                                        const res = await API.patch(`/items/rejected/${rejectModalItem._id}`, { quantityRejected: val });
+                                        if (res.data?.success) { setSuccess(`Marked ${val} units as Rejected!`); setRejectModalItem(null); setRejectModalValue(""); fetchItems(); }
+                                    } catch(err) { setError(err.response?.data?.message || "Operation failed."); }
+                                }}
+                            >Confirm Reject</button>
+                            <button className="btn btn-secondary" style={{ height: "46px", padding: "0 16px" }} onClick={() => setRejectModalItem(null)}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Edit Popup Modal ── */}
+            {editModalItem && (() => {
+                const toggleField = (f) => setEditingFields(prev => { const n = new Set(prev); n.has(f) ? n.delete(f) : n.add(f); return n; });
+                const isEditing = (f) => editingFields.has(f);
+                const colorDot = (c) => c === "gold" ? "#ffd700" : c === "rose gold" ? "#b76e79" : "#222";
+                const EditBtn = ({ field }) => (
+                    <button type="button" onClick={() => toggleField(field)}
+                        style={{ background: isEditing(field) ? "rgba(139,92,246,0.12)" : "var(--bg-secondary)", border: `1px solid ${isEditing(field) ? "var(--accent-light)" : "var(--border-color)"}`, borderRadius: "8px", width: "32px", height: "32px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Pencil size={13} color={isEditing(field) ? "var(--accent-light)" : "var(--text-secondary)"} />
+                    </button>
+                );
+                const ReadRow = ({ label, value, field, children }) => (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", textAlign: "left" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</label>
+                            <EditBtn field={field} />
+                        </div>
+                        {isEditing(field) ? children : (
+                            <div style={{ padding: "10px 14px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", fontSize: "14px", fontWeight: "600", color: "var(--text-primary)", minHeight: "40px", display: "flex", alignItems: "center" }}>{value}</div>
+                        )}
+                    </div>
+                );
+                return (
+                    <div onClick={() => { setEditModalItem(null); setEditingFields(new Set()); }} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", background: "rgba(255,255,255,0.15)", overflowY: "auto" }}>
+                        <div onClick={(e) => e.stopPropagation()} className="animate-fade-in" style={{ background: "var(--bg-primary)", borderRadius: "var(--radius-md)", boxShadow: "0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px var(--border-color)", padding: "24px 20px 20px", width: "100%", maxWidth: "420px", display: "flex", flexDirection: "column", gap: "14px", position: "relative" }}>
+                            {/* Close */}
+                            <button onClick={() => { setEditModalItem(null); setEditingFields(new Set()); }} style={{ position: "absolute", top: "12px", right: "12px", background: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "32px", height: "32px", color: "var(--text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={15} /></button>
+                            {/* Header */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: "rgba(139,92,246,0.12)", border: "1.5px solid rgba(139,92,246,0.35)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                    <Sliders size={20} color="var(--accent-light)" />
+                                </div>
+                                <div style={{ textAlign: "left" }}>
+                                    <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", fontFamily: "var(--font-heading)" }}>Edit Item Details</div>
+                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>Tap ✏️ beside a field to edit it</div>
+                                </div>
+                            </div>
+                            {/* Divider */}
+                            <div style={{ borderTop: "1px solid var(--border-color)" }} />
+                            {/* Color — always visible, toggle unlocks selection */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", textAlign: "left" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Color</label>
+                                    <EditBtn field="color" />
+                                </div>
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    {["gold", "rose gold", "black"].map((option) => {
+                                        const isOriginal = editModalItem.color === option;
+                                        const isSelected = editInputs.color === option;
+                                        const unlocked = isEditing("color");
+                                        return (
+                                            <label key={option} onClick={() => unlocked && setEditInputs({...editInputs, color: option})}
+                                                style={{
+                                                    flex: 1,
+                                                    display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+                                                    padding: "10px 4px",
+                                                    borderRadius: "var(--radius-sm)",
+                                                    border: isSelected
+                                                        ? "2px solid var(--accent-light)"
+                                                        : isOriginal
+                                                            ? "1.5px dashed rgba(139,92,246,0.5)"
+                                                            : "1px solid var(--border-color)",
+                                                    background: isSelected
+                                                        ? "rgba(139,92,246,0.12)"
+                                                        : isOriginal && !unlocked
+                                                            ? "rgba(139,92,246,0.14)"
+                                                            : "#f8fafc",
+                                                    cursor: unlocked ? "pointer" : "default",
+                                                    opacity: unlocked ? 1 : isOriginal ? 1 : 0.4,
+                                                    userSelect: "none",
+                                                    transition: "all 0.18s",
+                                                    position: "relative",
+                                                    overflow: "hidden"
+                                                }}>
+                                                <input type="radio" name="editColorModal" value={option} checked={isSelected} readOnly style={{ position: "absolute", opacity: 0, width: 0, height: 0 }} />
+                                                <div style={{
+                                                    display: "flex", alignItems: "center", gap: "6px",
+                                                    filter: isOriginal && !unlocked ? "blur(0.4px)" : "none",
+                                                    transition: "filter 0.2s"
+                                                }}>
+                                                    <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: colorDot(option), border: "1px solid rgba(0,0,0,0.15)", flexShrink: 0 }}></div>
+                                                    <span style={{ fontSize: "12px", fontWeight: isSelected ? "700" : "500", color: isSelected ? "var(--accent-light)" : "var(--text-primary)", textTransform: "capitalize" }}>{option}</span>
+                                                </div>
+                                                {isOriginal && !unlocked && (
+                                                    <span style={{ position: "absolute", top: "3px", right: "4px", fontSize: "8px", color: "rgba(139,92,246,0.8)", fontWeight: "700", letterSpacing: "0.3px" }}>NOW</span>
+                                                )}
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            {/* Price */}
+                            <ReadRow label="Price (per Sq. Ft)" value={`₹${editInputs.price}/sqft`} field="price">
+                                <input type="number" className="form-input" placeholder="Price" value={editInputs.price} onChange={(e) => setEditInputs({...editInputs, price: e.target.value})} autoFocus style={{ padding: "10px 14px", height: "44px" }} />
+                            </ReadRow>
+                            {/* Length & Width */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                                <ReadRow label="Length (in)" value={editInputs.size_length} field="size_length">
+                                    <input type="number" className="form-input" placeholder="L" value={editInputs.size_length} onChange={(e) => setEditInputs({...editInputs, size_length: e.target.value})} autoFocus style={{ padding: "10px 14px", height: "44px" }} />
+                                </ReadRow>
+                                <ReadRow label="Width (in)" value={editInputs.size_width} field="size_width">
+                                    <input type="number" className="form-input" placeholder="W" value={editInputs.size_width} onChange={(e) => setEditInputs({...editInputs, size_width: e.target.value})} style={{ padding: "10px 14px", height: "44px" }} />
+                                </ReadRow>
+                            </div>
+                            {/* Completed & Rejected */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                                <ReadRow label="Total Completed" value={editInputs.quantityCompleted} field="quantityCompleted">
+                                    <input type="number" className="form-input" value={editInputs.quantityCompleted} onChange={(e) => setEditInputs({...editInputs, quantityCompleted: e.target.value})} autoFocus style={{ padding: "10px 14px", height: "44px" }} />
+                                </ReadRow>
+                                <ReadRow label="Total Rejected" value={editInputs.quantityRejected} field="quantityRejected">
+                                    <input type="number" className="form-input" value={editInputs.quantityRejected} onChange={(e) => setEditInputs({...editInputs, quantityRejected: e.target.value})} style={{ padding: "10px 14px", height: "44px" }} />
+                                </ReadRow>
+                            </div>
+                            {/* Outgoing Date */}
+                            <ReadRow label="Outgoing Date" value={editInputs.outgoingDate ? editInputs.outgoingDate.replace("T", "  ") : "Not set"} field="outgoingDate">
+                                <input type="datetime-local" className="form-input" value={editInputs.outgoingDate || ""} onChange={(e) => setEditInputs({...editInputs, outgoingDate: e.target.value})} style={{ padding: "10px 14px", height: "44px" }} />
+                            </ReadRow>
+                            {/* Actions */}
+                            <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+                                <button className="btn btn-primary" style={{ flexGrow: 1, height: "46px", fontSize: "14px" }}
+                                    onClick={async () => {
+                                        setError(""); setSuccess("");
+                                        try {
+                                            let updated = false;
+                                            if (editInputs.color !== editModalItem.color) { await API.patch(`/items/color/${editModalItem._id}`, { color: editInputs.color }); updated = true; }
+                                            if (Number(editInputs.size_length) !== editModalItem.size_length) { await API.patch(`/items/size-length/${editModalItem._id}`, { size_length: Number(editInputs.size_length) }); updated = true; }
+                                            if (Number(editInputs.size_width) !== editModalItem.size_width) { await API.patch(`/items/size-width/${editModalItem._id}`, { size_width: Number(editInputs.size_width) }); updated = true; }
+                                            if (Number(editInputs.price) !== editModalItem.price) { await API.patch(`/items/price/${editModalItem._id}`, { price: Number(editInputs.price) }); updated = true; }
+                                            const origDT = editModalItem.outgoingDate ? new Date(new Date(editModalItem.outgoingDate).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+                                            if (editInputs.outgoingDate !== origDT) { await API.patch(`/items/outgoing-date/${editModalItem._id}`, { outgoingDate: editInputs.outgoingDate ? new Date(editInputs.outgoingDate).toISOString() : null }); updated = true; }
+                                            if (Number(editInputs.quantityCompleted) !== (editModalItem.quantityCompleted || 0)) { await API.patch(`/items/completed/${editModalItem._id}`, { quantityCompleted: Number(editInputs.quantityCompleted), isAbsolute: true }); updated = true; }
+                                            if (Number(editInputs.quantityRejected) !== (editModalItem.quantityRejected || 0)) { await API.patch(`/items/rejected/${editModalItem._id}`, { quantityRejected: Number(editInputs.quantityRejected), isAbsolute: true }); updated = true; }
+                                            if (updated) { setSuccess("Item updated!"); }
+                                            setEditModalItem(null); setEditingFields(new Set()); fetchItems();
+                                        } catch(err) { setError(err.response?.data?.message || "Update failed."); }
+                                    }}
+                                ><Save size={16} /> Save Changes</button>
+                                <button className="btn btn-secondary" style={{ height: "46px", padding: "0 16px" }} onClick={() => { setEditModalItem(null); setEditingFields(new Set()); }}>Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Payment Popup Modal */}
+            {paymentModalItem && (
+                <div
+                    onClick={() => setPaymentModalItem(null)}
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 1100,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "24px",
+                        backdropFilter: "blur(6px)",
+                        WebkitBackdropFilter: "blur(6px)",
+                        background: "rgba(255, 255, 255, 0.15)"
+                    }}
+                >
+                    {/* Modal Card — stop click propagation so tapping inside doesn't close */}
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="animate-fade-in"
+                        style={{
+                            background: "var(--bg-primary)",
+                            borderRadius: "var(--radius-md)",
+                            boxShadow: "0 24px 60px rgba(0,0,0,0.35), 0 0 0 1px var(--border-color)",
+                            padding: "28px 24px 24px",
+                            width: "100%",
+                            maxWidth: "380px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "18px",
+                            position: "relative"
+                        }}
+                    >
+                        {/* Close button */}
+                        <button
+                            onClick={() => setPaymentModalItem(null)}
+                            style={{
+                                position: "absolute",
+                                top: "12px",
+                                right: "12px",
+                                background: "var(--bg-secondary)",
+                                border: "1px solid var(--border-color)",
+                                borderRadius: "50%",
+                                width: "32px",
+                                height: "32px",
+                                color: "var(--text-secondary)",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center"
+                            }}
+                        >
+                            <X size={15} />
+                        </button>
+
+                        {/* Icon + Title */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{
+                                width: "46px", height: "46px", borderRadius: "50%",
+                                background: "rgba(255, 200, 0, 0.12)",
+                                border: "1.5px solid rgba(255, 200, 0, 0.35)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                flexShrink: 0
+                            }}>
+                                <DollarSign size={22} color="gold" />
+                            </div>
+                            <div style={{ textAlign: "left" }}>
+                                <div style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", fontFamily: "var(--font-heading)" }}>
+                                    Add Payment Received
+                                </div>
+                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                                    {paymentModalItem.color} item · ₹{paymentModalItem.price}/sqft
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Current balance info */}
+                        <div style={{
+                            background: "var(--bg-secondary)",
+                            borderRadius: "var(--radius-sm)",
+                            padding: "10px 14px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: "13px"
+                        }}>
+                            <span style={{ color: "var(--text-secondary)" }}>Already Received</span>
+                            <strong style={{ color: "var(--success)" }}>₹{paymentModalItem.paymentReceived}</strong>
+                        </div>
+
+                        {/* Amount input */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>
+                                New Payment Amount
+                            </label>
+                            <input
+                                type="number"
+                                className="form-input"
+                                placeholder="Amount in ₹"
+                                value={paymentModalValue}
+                                onChange={(e) => setPaymentModalValue(e.target.value)}
+                                autoFocus
+                                style={{ padding: "12px 14px", fontSize: "16px", height: "50px" }}
+                            />
+                        </div>
+
+                        {/* Action buttons */}
+                        <div style={{ display: "flex", gap: "10px" }}>
+                            <button
+                                className="btn btn-primary"
+                                style={{ flexGrow: 1, height: "46px", fontSize: "14px" }}
+                                onClick={async () => {
+                                    const val = Number(paymentModalValue);
+                                    if (isNaN(val) || val <= 0) {
+                                        setError("Please enter a valid payment amount.");
+                                        return;
+                                    }
+                                    setError("");
+                                    setSuccess("");
+                                    try {
+                                        const res = await API.patch(`/items/payment/${paymentModalItem._id}`, { paymentReceived: val });
+                                        if (res.data?.success) {
+                                            setSuccess(`Recorded payment of ₹${val}!`);
+                                            setPaymentModalItem(null);
+                                            setPaymentModalValue("");
+                                            fetchItems();
+                                        }
+                                    } catch (err) {
+                                        setError(err.response?.data?.message || "Payment recording failed.");
+                                    }
+                                }}
+                            >
+                                Record Payment
+                            </button>
+                            <button
+                                className="btn btn-secondary"
+                                style={{ height: "46px", padding: "0 16px" }}
+                                onClick={() => setPaymentModalItem(null)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
