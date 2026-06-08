@@ -10,6 +10,32 @@ import html2pdf from "html2pdf.js";
 const COLORS = ["gold", "rose gold", "black"];
 const colorDot = (c) => c === "gold" ? "#ffd700" : c === "rose gold" ? "#b76e79" : "#222";
 
+const ColorPicker = ({ value, onChange, name }) => (
+    <div style={{ display: "flex", gap: "8px" }}>
+        {COLORS.map(c => {
+            const sel = value === c;
+            const dot = colorDot(c);
+            return (
+                <label key={c} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 4px", borderRadius: "var(--radius-sm)", border: `${sel ? "2px solid var(--accent-light)" : "1px solid var(--border-color)"}`, background: sel ? "rgba(139,92,246,0.10)" : "#f8fafc", cursor: "pointer", transition: "all 0.15s", userSelect: "none" }}>
+                    <input type="radio" name={name} value={c} checked={sel} onChange={() => onChange(c)} style={{ position: "absolute", opacity: 0, width: 0, height: 0 }} />
+                    <div style={{ width: "11px", height: "11px", borderRadius: "50%", background: dot, border: "1px solid rgba(0,0,0,0.2)", flexShrink: 0 }} />
+                    <span style={{ fontSize: "12px", fontWeight: sel ? "700" : "500", textTransform: "capitalize", color: sel ? "var(--accent-light)" : "var(--text-primary)" }}>{c}</span>
+                </label>
+            );
+        })}
+    </div>
+);
+
+const Modal = ({ onClose, children, maxW = "400px" }) => (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.15)", backdropFilter: "blur(6px)" }} />
+        <div onClick={e => e.stopPropagation()} className="animate-fade-in" style={{ background: "var(--bg-primary)", borderRadius: "var(--radius-md)", boxShadow: "0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px var(--border-color)", padding: "24px", width: "100%", maxWidth: maxW, display: "flex", flexDirection: "column", gap: "16px", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
+            <button onClick={onClose} style={{ position: "absolute", top: "12px", right: "12px", background: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}><X size={14} /></button>
+            {children}
+        </div>
+    </div>
+);
+
 const PartyDetails = ({ partyName, onBack }) => {
     const reportRef = useRef(null);
     const [orders, setOrders] = useState([]);
@@ -295,29 +321,7 @@ const PartyDetails = ({ partyName, onBack }) => {
     const toggleOrder = (id) => setExpandedOrders(prev => ({ ...prev, [id]: !prev[id] }));
 
     // ---- Render helpers ----
-    const ColorPicker = ({ value, onChange, name }) => (
-        <div style={{ display: "flex", gap: "8px" }}>
-            {COLORS.map(c => {
-                const sel = value === c;
-                return (
-                    <label key={c} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 4px", borderRadius: "var(--radius-sm)", border: `${sel ? "2px solid var(--accent-light)" : "1px solid var(--border-color)"}`, background: sel ? "rgba(139,92,246,0.10)" : "#f8fafc", cursor: "pointer", transition: "all 0.15s", userSelect: "none" }}>
-                        <input type="radio" name={name} value={c} checked={sel} onChange={() => onChange(c)} style={{ position: "absolute", opacity: 0, width: 0, height: 0 }} />
-                        <div style={{ width: "11px", height: "11px", borderRadius: "50%", background: colorDot(c), border: "1px solid rgba(0,0,0,0.2)", flexShrink: 0 }} />
-                        <span style={{ fontSize: "12px", fontWeight: sel ? "700" : "500", textTransform: "capitalize", color: sel ? "var(--accent-light)" : "var(--text-primary)" }}>{c}</span>
-                    </label>
-                );
-            })}
-        </div>
-    );
 
-    const Modal = ({ onClose, children, maxW = "400px" }) => (
-        <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(6px)", background: "rgba(255,255,255,0.15)" }}>
-            <div onClick={e => e.stopPropagation()} className="animate-fade-in" style={{ background: "var(--bg-primary)", borderRadius: "var(--radius-md)", boxShadow: "0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px var(--border-color)", padding: "24px", width: "100%", maxWidth: maxW, display: "flex", flexDirection: "column", gap: "16px", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
-                <button onClick={onClose} style={{ position: "absolute", top: "12px", right: "12px", background: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "50%", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}><X size={14} /></button>
-                {children}
-            </div>
-        </div>
-    );
 
     return (
         <>
@@ -588,24 +592,10 @@ const PartyDetails = ({ partyName, onBack }) => {
                 </Modal>
             )}
 
-            {/* Edit Modal */}
+            {/* Edit Item Modal */}
             {editModal && (() => {
                 const tog = (f) => setEditFields(p => { const n = new Set(p); n.has(f) ? n.delete(f) : n.add(f); return n; });
                 const isE = (f) => editFields.has(f);
-                const EB = ({ f }) => (
-                    <button type="button" onClick={() => tog(f)} style={{ background: isE(f) ? "rgba(139,92,246,0.12)" : "var(--bg-secondary)", border: `1px solid ${isE(f) ? "var(--accent-light)" : "var(--border-color)"}`, borderRadius: "8px", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Pencil size={12} color={isE(f) ? "var(--accent-light)" : "var(--text-secondary)"} />
-                    </button>
-                );
-                const RR = ({ label, val, f, children }) => (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", textAlign: "left" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>{label}</label>
-                            <EB f={f} />
-                        </div>
-                        {isE(f) ? children : <div style={{ padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", fontSize: "14px", fontWeight: "600" }}>{val}</div>}
-                    </div>
-                );
                 return (
                     <Modal onClose={() => { setEditModal(null); setEditFields(new Set()); }} maxW="420px">
                         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -616,31 +606,61 @@ const PartyDetails = ({ partyName, onBack }) => {
                             </div>
                         </div>
                         <div style={{ borderTop: "1px solid var(--border-color)" }} />
-                        <RR label="Item Name" val={editInputs.itemName || "No name"} f="itemName"><input className="form-input" value={editInputs.itemName} onChange={e => setEditInputs(p => ({ ...p, itemName: e.target.value }))} style={{ height: "40px" }} /></RR>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "4px", textAlign: "left" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Color</label>
-                                <EB f="color" />
-                            </div>
-                            {isE("color") ? (
-                                <ColorPicker value={editInputs.color} onChange={v => setEditInputs(p => ({ ...p, color: v }))} name="editColor" />
-                            ) : (
-                                <div style={{ padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", fontSize: "14px", fontWeight: "600", textTransform: "capitalize", display: "flex", alignItems: "center", gap: "8px" }}>
-                                    <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: colorDot(editInputs.color) }} />{editInputs.color}
+
+                        {/* Recursive Row Helper (Inlined to prevent re-mount) */}
+                        {[
+                            { label: "Item Name", f: "itemName", val: editInputs.itemName || "No name", type: "text" },
+                            { label: "Color", f: "color", val: editInputs.color, type: "color" },
+                            { label: "Length (in)", f: "size_length", val: editInputs.size_length, type: "number" },
+                            { label: "Width (in)", f: "size_width", val: editInputs.size_width, type: "number" },
+                            { label: "Qty Arrived", f: "quantityArrived", val: editInputs.quantityArrived, type: "number" },
+                            { label: "Completed", f: "quantityCompleted", val: editInputs.quantityCompleted, type: "number" },
+                            { label: "Rejected", f: "quantityRejected", val: editInputs.quantityRejected, type: "number" },
+                            { label: "Outgoing Date", f: "outgoingDate", val: editInputs.outgoingDate, type: "date" }
+                        ].map(row => (
+                            <div key={row.f} style={{ display: "flex", flexDirection: "column", gap: "4px", textAlign: "left" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>{row.label}</label>
+                                    <button type="button" onClick={() => tog(row.f)} style={{ background: isE(row.f) ? "rgba(139,92,246,0.12)" : "var(--bg-secondary)", border: `1px solid ${isE(row.f) ? "var(--accent-light)" : "var(--border-color)"}`, borderRadius: "8px", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <Pencil size={12} color={isE(row.f) ? "var(--accent-light)" : "var(--text-secondary)"} />
+                                    </button>
                                 </div>
-                            )}
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                            <RR label="Length (in)" val={editInputs.size_length} f="size_length"><input type="number" className="form-input" value={editInputs.size_length} onChange={e => setEditInputs(p => ({ ...p, size_length: e.target.value }))} style={{ height: "40px" }} /></RR>
-                            <RR label="Width (in)" val={editInputs.size_width} f="size_width"><input type="number" className="form-input" value={editInputs.size_width} onChange={e => setEditInputs(p => ({ ...p, size_width: e.target.value }))} style={{ height: "40px" }} /></RR>
-                        </div>
-                        <RR label="Qty Arrived" val={editInputs.quantityArrived} f="quantityArrived"><input type="number" className="form-input" value={editInputs.quantityArrived} onChange={e => setEditInputs(p => ({ ...p, quantityArrived: e.target.value }))} style={{ height: "40px" }} /></RR>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                            <RR label="Completed" val={editInputs.quantityCompleted} f="quantityCompleted"><input type="number" className="form-input" value={editInputs.quantityCompleted} onChange={e => setEditInputs(p => ({ ...p, quantityCompleted: e.target.value }))} style={{ height: "40px" }} /></RR>
-                            <RR label="Rejected" val={editInputs.quantityRejected} f="quantityRejected"><input type="number" className="form-input" value={editInputs.quantityRejected} onChange={e => setEditInputs(p => ({ ...p, quantityRejected: e.target.value }))} style={{ height: "40px" }} /></RR>
-                        </div>
-                        <RR label="Outgoing Date" val={editInputs.outgoingDate ? editInputs.outgoingDate.replace("T", " ") : "Not set"} f="outgoingDate"><input type="datetime-local" className="form-input" value={editInputs.outgoingDate || ""} onChange={e => setEditInputs(p => ({ ...p, outgoingDate: e.target.value }))} style={{ height: "40px" }} /></RR>
-                        <div style={{ display: "flex", gap: "10px" }}>
+                                {isE(row.f) ? (
+                                    row.type === "color" ? (
+                                        <ColorPicker value={editInputs.color} onChange={v => setEditInputs(p => ({ ...p, color: v }))} name="editColor" />
+                                    ) : row.type === "date" ? (
+                                        <input type="datetime-local" className="form-input" value={editInputs.outgoingDate || ""} onChange={e => setEditInputs(p => ({ ...p, outgoingDate: e.target.value }))} style={{ height: "40px" }} />
+                                    ) : (
+                                        <input
+                                            type={row.type}
+                                            className="form-input"
+                                            value={row.f === "itemName" ? editInputs.itemName : editInputs[row.f]}
+                                            onChange={e => {
+                                                let val = e.target.value;
+                                                if (row.type === "number") val = Math.max(0, val);
+                                                setEditInputs(p => ({ ...p, [row.f]: val }));
+                                            }}
+                                            min={row.type === "number" ? 0 : undefined}
+                                            style={{ height: "40px" }}
+                                        />
+                                    )
+                                ) : (
+                                    <div style={{ padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", fontSize: "14px", fontWeight: "600" }}>
+                                        {row.type === "color" ? (
+                                            <div style={{ display: "flex", alignItems: "center", gap: "8px", textTransform: "capitalize" }}>
+                                                <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: colorDot(editInputs.color) }} />{editInputs.color}
+                                            </div>
+                                        ) : row.type === "date" ? (
+                                            editInputs.outgoingDate ? editInputs.outgoingDate.replace("T", " ") : "Not set"
+                                        ) : (
+                                            row.val
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                             <button className="btn btn-primary" style={{ flexGrow: 1, height: "44px" }} onClick={handleSaveEdit}><Save size={15} /> Save Changes</button>
                             <button className="btn btn-secondary" style={{ height: "44px", padding: "0 14px" }} onClick={() => { setEditModal(null); setEditFields(new Set()); }}>Cancel</button>
                         </div>
@@ -650,22 +670,8 @@ const PartyDetails = ({ partyName, onBack }) => {
 
             {/* Edit Order Modal */}
             {editOrderModal && (() => {
-                const togOrder = (f) => setEditOrderFields(p => { const n = new Set(p); n.has(f) ? n.delete(f) : n.add(f); return n; });
-                const isOE = (f) => editOrderFields.has(f);
-                const O_EB = ({ f }) => (
-                    <button type="button" onClick={() => togOrder(f)} style={{ background: isOE(f) ? "rgba(139,92,246,0.12)" : "var(--bg-secondary)", border: `1px solid ${isOE(f) ? "var(--accent-light)" : "var(--border-color)"}`, borderRadius: "8px", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Pencil size={12} color={isOE(f) ? "var(--accent-light)" : "var(--text-secondary)"} />
-                    </button>
-                );
-                const O_RR = ({ label, val, f, children }) => (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", textAlign: "left" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>{label}</label>
-                            <O_EB f={f} />
-                        </div>
-                        {isOE(f) ? children : <div style={{ padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", fontSize: "14px", fontWeight: "600" }}>{val}</div>}
-                    </div>
-                );
+                const tog = (f) => setEditOrderFields(p => { const n = new Set(p); n.has(f) ? n.delete(f) : n.add(f); return n; });
+                const isE = (f) => editOrderFields.has(f);
                 return (
                     <Modal onClose={() => { setEditOrderModal(null); setEditOrderFields(new Set()); }} maxW="420px">
                         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -676,10 +682,38 @@ const PartyDetails = ({ partyName, onBack }) => {
                             </div>
                         </div>
                         <div style={{ borderTop: "1px solid var(--border-color)" }} />
-                        <O_RR label="Order Name" val={editOrderInputs.orderName} f="orderName"><input className="form-input" value={editOrderInputs.orderName} onChange={e => setEditOrderInputs(p => ({ ...p, orderName: e.target.value }))} style={{ height: "40px" }} /></O_RR>
-                        <O_RR label="Price per Sq. Inch" val={editOrderInputs.price} f="price"><input type="number" className="form-input" value={editOrderInputs.price} onChange={e => setEditOrderInputs(p => ({ ...p, price: e.target.value }))} style={{ height: "40px" }} /></O_RR>
 
-                        <div style={{ display: "flex", gap: "10px" }}>
+                        {[
+                            { label: "Order Name", f: "orderName", val: editOrderInputs.orderName, type: "text" },
+                            { label: "Price per Sq. Inch", f: "price", val: editOrderInputs.price, type: "number" }
+                        ].map(row => (
+                            <div key={row.f} style={{ display: "flex", flexDirection: "column", gap: "4px", textAlign: "left" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>{row.label}</label>
+                                    <button type="button" onClick={() => tog(row.f)} style={{ background: isE(row.f) ? "rgba(139,92,246,0.12)" : "var(--bg-secondary)", border: `1px solid ${isE(row.f) ? "var(--accent-light)" : "var(--border-color)"}`, borderRadius: "8px", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <Pencil size={12} color={isE(row.f) ? "var(--accent-light)" : "var(--text-secondary)"} />
+                                    </button>
+                                </div>
+                                {isE(row.f) ? (
+                                    <input
+                                        type={row.type}
+                                        className="form-input"
+                                        value={editOrderInputs[row.f]}
+                                        onChange={e => {
+                                            let val = e.target.value;
+                                            if (row.type === "number") val = Math.max(0, val);
+                                            setEditOrderInputs(p => ({ ...p, [row.f]: val }));
+                                        }}
+                                        min={row.type === "number" ? 0 : undefined}
+                                        style={{ height: "40px" }}
+                                    />
+                                ) : (
+                                    <div style={{ padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", fontSize: "14px", fontWeight: "600" }}>{row.val}</div>
+                                )}
+                            </div>
+                        ))}
+
+                        <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                             <button className="btn btn-primary" style={{ flexGrow: 1, height: "44px" }} onClick={handleSaveEditOrder}><Save size={15} /> Save Changes</button>
                             <button className="btn btn-secondary" style={{ height: "44px", padding: "0 14px" }} onClick={() => { setEditOrderModal(null); setEditOrderFields(new Set()); }}>Cancel</button>
                         </div>
