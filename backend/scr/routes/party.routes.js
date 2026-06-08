@@ -6,7 +6,9 @@ import {
     getRejectedItemsAll,
     calculateTotalPrice,
     generateReportSingleParty,
-    generateReportAllParties
+    generateReportAllParties,
+    updatePartyPayment,
+    getPartyPaymentSummary
 } from "../controllers/party.controllers.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js"
 
@@ -22,5 +24,7 @@ router.route("/rejected-all").get(getRejectedItemsAll)
 router.route("/total-price/:partyName").post(calculateTotalPrice)
 router.route("/report/single/:partyName").post(generateReportSingleParty)
 router.route("/report/all").post(generateReportAllParties)
+router.route("/payment/:partyName").patch(updatePartyPayment)
+router.route("/payment-summary/:partyName").get(getPartyPaymentSummary)
 
 export default router

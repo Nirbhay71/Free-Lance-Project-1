@@ -4,31 +4,31 @@ import { Party } from "../models/party.models.js"
 import { Item } from "../models/items.models.js"
 import { ApiResponce } from "../utils/ApiResponce.js"
 import { uploadFileOnCloudinary, deleteFileFromCloudinary } from "../utils/cloudinary.js"
- 
+
 const getParty = async (name, createdBy) => {
     try {
-        const party = await Party.findOne({partyName : name, createdBy})
-    
-        if(!party){
+        const party = await Party.findOne({ partyName: name, createdBy })
+
+        if (!party) {
             throw new ApiError(404, 'No such Party Name exists')
         }
-    
+
         return party;
     } catch (error) {
         throw new ApiError(410, 'Something went wrong')
     }
 }
 
-const addNewItem = asyncHandler(async (req, res)=>{
+const addNewItem = asyncHandler(async (req, res) => {
     const { partyName } = req.params;
 
-    if(!partyName){
+    if (!partyName) {
         throw new ApiError(400, 'No Party Name Provided')
     }
 
     const party = await getParty(partyName, req.user._id);
 
-    if(!party){
+    if (!party) {
         throw new ApiError(404, 'No such Party Name exists')
     }
 
@@ -38,12 +38,12 @@ const addNewItem = asyncHandler(async (req, res)=>{
         cleanBody[key.trim()] = req.body[key];
     });
 
-    const {color, size_length, size_width, price, quantityArrived} = cleanBody;
+    const { color, size_length, size_width, quantityArrived, itemName, orderId } = cleanBody;
 
     console.log("Processed req.body:", cleanBody);
-    
-    if(!color || !size_length || !size_width || !price || !quantityArrived){
-        throw new ApiError(400, 'No Item Details Provided')
+
+    if (!color || !size_length || !size_width || !quantityArrived) {
+        throw new ApiError(400, 'color, size_length, size_width, and quantityArrived are required')
     }
 
     const normalizedColor = String(color).trim().toLowerCase();
@@ -52,75 +52,74 @@ const addNewItem = asyncHandler(async (req, res)=>{
         throw new ApiError(400, "Invalid color option. Must be gold, rose gold, or black.");
     }
 
+    // Photo is optional
+    let photoUrl = "";
     const photoLocalPath = req.file?.path;
-
-    if(!photoLocalPath){
-        throw new ApiError(400, 'Photo not provided')
-    }
-
-    const photo = await uploadFileOnCloudinary(photoLocalPath)
-
-    if(!photo){
-        throw new ApiError(400, "Unable to upload the provided Photo")
+    if (photoLocalPath) {
+        const photo = await uploadFileOnCloudinary(photoLocalPath)
+        if (photo) {
+            photoUrl = photo.url;
+        }
     }
 
     const item = await Item.create({
+        itemName: (itemName || "").trim(),
         color: normalizedColor,
-        price,
-        quantityArrived,
-        size_length,
-        size_width,
+        quantityArrived: Number(quantityArrived),
+        size_length: Number(size_length),
+        size_width: Number(size_width),
         partyId: party?._id,
-        photo : photo?.url
+        photo: photoUrl,
+        ...(orderId ? { orderId } : {})
     })
 
-    if(!item){
+    if (!item) {
         throw new ApiError(400, "Unable to create the Item")
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            item,
-            "New Item Created Successfully"
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                item,
+                "New Item Created Successfully"
+            )
         )
-    )
 
 })
 
 // Need to check it gives all items or not
-const getItemFromPartyName = asyncHandler(async (req, res)=>{
+const getItemFromPartyName = asyncHandler(async (req, res) => {
     const { partyName } = req.params
-    if(!partyName){
+    if (!partyName) {
         throw new ApiError(400, 'No Party Name Provided')
     }
 
     const party = await getParty(partyName, req.user._id)
 
-    const items = await Item.find({partyId : party?._id})
+    const items = await Item.find({ partyId: party?._id })
 
-    if(!items?.length){
+    if (!items?.length) {
         throw new ApiError(404, 'No Items on given Party Name  Found')
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            items,
-            "Items fetched successfully from given Party Name"
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                items,
+                "Items fetched successfully from given Party Name"
+            )
         )
-    )
 
 })
 
-const itemCompleted = asyncHandler(async (req, res)=>{
+const itemCompleted = asyncHandler(async (req, res) => {
     const { itemId } = req.params;
 
-    if(!itemId){
+    if (!itemId) {
         throw new ApiError(400, 'No Item ID Provided')
     }
 
@@ -136,7 +135,7 @@ const itemCompleted = asyncHandler(async (req, res)=>{
 
     const item = await Item.findById(itemId);
 
-    if(!item){
+    if (!item) {
         throw new ApiError(404, "Item not found")
     }
 
@@ -156,20 +155,20 @@ const itemCompleted = asyncHandler(async (req, res)=>{
     await item.save();
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            item,
-            "Completed quantity of Item Updated Successfully"
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                item,
+                "Completed quantity of Item Updated Successfully"
+            )
         )
-    )
 })
 
-const itemRejected = asyncHandler(async (req, res)=>{
+const itemRejected = asyncHandler(async (req, res) => {
     const { itemId } = req.params;
 
-    if(!itemId){
+    if (!itemId) {
         throw new ApiError(400, 'No Item ID Provided')
     }
 
@@ -185,7 +184,7 @@ const itemRejected = asyncHandler(async (req, res)=>{
 
     const item = await Item.findById(itemId);
 
-    if(!item){
+    if (!item) {
         throw new ApiError(404, "Item not found")
     }
 
@@ -205,57 +204,21 @@ const itemRejected = asyncHandler(async (req, res)=>{
     await item.save();
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            item,
-            "Rejected quantity of Item Updated Successfully"
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                item,
+                "Rejected quantity of Item Updated Successfully"
+            )
         )
-    )
 })
 
-const updatePaymentReceived = asyncHandler(async (req, res)=>{
+
+const updatePhotoOfItem = asyncHandler(async (req, res) => {
     const { itemId } = req.params;
 
-    if(!itemId){
-        throw new ApiError(400, 'No Item ID Provided')
-    }
-
-    let paymentReceived = req.body.paymentReceived;
-    if (paymentReceived === undefined) {
-        paymentReceived = typeof req.body === 'object' ? req.body.paymentReceived : req.body;
-    }
-    paymentReceived = Number(paymentReceived);
-
-    if (isNaN(paymentReceived) || paymentReceived < 0) {
-        throw new ApiError(400, "Payment received must be a non-negative number")
-    }
-
-    const item = await Item.findById(itemId);
-
-    if(!item){
-        throw new ApiError(404, "Item not found")
-    }
-
-    item.paymentReceived = paymentReceived;
-    await item.save();
-
-    return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            item,
-            "Payment Received of Item Updated Successfully"
-        )
-    )
-})
-
-const updatePhotoOfItem = asyncHandler(async (req, res)=>{
-    const { itemId } = req.params;
-
-    if(!itemId){
+    if (!itemId) {
         throw new ApiError(400, 'No Item ID Provided')
     }
 
@@ -266,13 +229,13 @@ const updatePhotoOfItem = asyncHandler(async (req, res)=>{
 
     const photoLocalPath = req.file?.path;
 
-    if(!photoLocalPath){
+    if (!photoLocalPath) {
         throw new ApiError(400, "Photo not provided")
     }
 
     const photo = await uploadFileOnCloudinary(photoLocalPath)
 
-    if(!photo){
+    if (!photo) {
         throw new ApiError(400, "Unable to upload the provided Photo")
     }
 
@@ -286,27 +249,27 @@ const updatePhotoOfItem = asyncHandler(async (req, res)=>{
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200, 
-            item, 
-            "Photo of Item Updated Successfully"
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                item,
+                "Photo of Item Updated Successfully"
+            )
         )
-    )
 
 })
 
-const updateColor = asyncHandler(async (req, res)=>{
+const updateColor = asyncHandler(async (req, res) => {
     const { itemId } = req.params;
 
-    if(!itemId){
+    if (!itemId) {
         throw new ApiError(400, 'No Item ID Provided')
     }
 
     const color = req.body?.color;
 
-    if(!color){
+    if (!color) {
         throw new ApiError(400, "No Color Provided")
     }
 
@@ -316,115 +279,115 @@ const updateColor = asyncHandler(async (req, res)=>{
         throw new ApiError(400, "Invalid color option. Must be gold, rose gold, or black.");
     }
 
-    const item 	= await Item.findByIdAndUpdate(
+    const item = await Item.findByIdAndUpdate(
         itemId,
         {
-            $set : {color : normalizedColor}
+            $set: { color: normalizedColor }
         },
-        {new : true, runValidators: true}
+        { new: true, runValidators: true }
     )
 
-    if(!item){
-        throw  new ApiError(404, "Not able to update the color of item")
+    if (!item) {
+        throw new ApiError(404, "Not able to update the color of item")
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            item,
-            "Color of Item Updated Successfully"
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                item,
+                "Color of Item Updated Successfully"
+            )
         )
-    )
 })
 
-const updateSizeLength = asyncHandler(async (req, res)=>{
+const updateSizeLength = asyncHandler(async (req, res) => {
     const { itemId } = req.params;
 
-    if(!itemId){
+    if (!itemId) {
         throw new ApiError(400, 'No Item ID Provided')
     }
 
     const sizeLength = req.body?.size_length;
 
-    if(!sizeLength){
+    if (!sizeLength) {
         throw new ApiError(400, "Size Length not provided")
     }
 
     const item = await Item.findByIdAndUpdate(
         itemId,
-        {size_length: sizeLength},
-        {new : true}
+        { size_length: sizeLength },
+        { new: true }
     )
 
-    if(!item){
+    if (!item) {
         throw new ApiError(404, "Not able to update the size length of item")
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            item,
-            "Size Length of Item Updated Successfully"
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                item,
+                "Size Length of Item Updated Successfully"
+            )
         )
-    )
 })
 
-const updateSizeWidth = asyncHandler(async (req, res)=>{
+const updateSizeWidth = asyncHandler(async (req, res) => {
     const { itemId } = req.params;
 
-    if(!itemId){
+    if (!itemId) {
         throw new ApiError(400, 'No Item ID Provided')
     }
 
     const sizeWidth = req.body?.size_width;
 
-    if(!sizeWidth){
+    if (!sizeWidth) {
         throw new ApiError(400, "Size Width not provided")
     }
 
     const item = await Item.findByIdAndUpdate(
         itemId,
-        {size_width : sizeWidth},
-        {new : true}
+        { size_width: sizeWidth },
+        { new: true }
     )
 
-    if(!item){
+    if (!item) {
         throw new ApiError(404, "Not able to update the size width of item")
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            item,
-            "Size width of Item Updated Successfully"
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                item,
+                "Size width of Item Updated Successfully"
+            )
         )
-    )
 })
 
 const deleteItem = asyncHandler(async (req, res) => {
-        const { itemId } = req.params;
+    const { itemId } = req.params;
 
-        if (!itemId) {
-            throw new ApiError(400, 'No Item ID Provided')
-        }
+    if (!itemId) {
+        throw new ApiError(400, 'No Item ID Provided')
+    }
 
-        const item 	= await Item.findByIdAndDelete(itemId)
-        
-        if(!item){
-            throw new ApiError(404, "Not able to delete the item")
-        }
+    const item = await Item.findByIdAndDelete(itemId)
 
-        if (item.photo) {
-            deleteFileFromCloudinary(item.photo);
-        }
+    if (!item) {
+        throw new ApiError(404, "Not able to delete the item")
+    }
 
-        return res
+    if (item.photo) {
+        deleteFileFromCloudinary(item.photo);
+    }
+
+    return res
         .status(200)
         .json(
             new ApiResponce(
@@ -434,38 +397,9 @@ const deleteItem = asyncHandler(async (req, res) => {
             )
         )
 
-    }
+}
 )
 
-const updatePrice = asyncHandler(async (req, res) => {
-    const { itemId } = req.params;
-
-        if (!itemId) {
-            throw new ApiError(400, 'No Item ID Provided')
-        }
-
-        const price = req.body?.price;
-
-        if(!price){
-            throw  new ApiError(404, "Price of item not provided")
-        }
-
-        const item 	= await Item.findByIdAndUpdate(itemId, {price : price})
-
-        if(!item){
-            throw new ApiError(404, "Not able to update the price of item")
-        }
-
-        return res
-        .status(200)
-        .json(
-            new ApiResponce(
-                200,
-                item,
-                "Price of Item Updated Successfully"
-            )
-        )
-})
 
 const updateOutgoingDate = asyncHandler(async (req, res) => {
     const { itemId } = req.params;
@@ -498,21 +432,21 @@ const updateOutgoingDate = asyncHandler(async (req, res) => {
 const getRejectedItems = asyncHandler(async (req, res) => {
     const { partyName } = req.params;
 
-    if(!partyName){
+    if (!partyName) {
         throw new ApiError(400, 'No Party Name Provided')
     }
 
     const party = await getParty(partyName, req.user._id);
 
-    if(!party){
-        throw  new ApiError(404, 'No such Party Name exists under your account')
+    if (!party) {
+        throw new ApiError(404, 'No such Party Name exists under your account')
     }
 
     const items = await Item.aggregate(
         [
             {
                 $match: {
-                    partyId : party?._id
+                    partyId: party?._id
                 }
             },
             {
@@ -523,40 +457,40 @@ const getRejectedItems = asyncHandler(async (req, res) => {
         ]
     )
 
-    if(!items?.length){
-        throw new ApiError(404,'No Items on given Party Name Found')
+    if (!items?.length) {
+        throw new ApiError(404, 'No Items on given Party Name Found')
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            items,
-            'Successfully fetched all rejected items from given Party Name'
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                items,
+                'Successfully fetched all rejected items from given Party Name'
+            )
         )
-    )
 
 })
 
 const getCompletedItems = asyncHandler(async (req, res) => {
     const { partyName } = req.params;
 
-    if(!partyName){
+    if (!partyName) {
         throw new ApiError(400, 'No Party Name Provided')
     }
 
     const party = await getParty(partyName, req.user._id);
 
-    if(!party){
-        throw  new ApiError(404, 'No such Party Name exists under your account')
+    if (!party) {
+        throw new ApiError(404, 'No such Party Name exists under your account')
     }
 
     const items = await Item.aggregate(
         [
             {
                 $match: {
-                    partyId : party?._id
+                    partyId: party?._id
                 }
             },
             {
@@ -567,40 +501,40 @@ const getCompletedItems = asyncHandler(async (req, res) => {
         ]
     )
 
-    if(!items?.length){
-        throw new ApiError(404,'No Items on given Party Name Found')
+    if (!items?.length) {
+        throw new ApiError(404, 'No Items on given Party Name Found')
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            items,
-            'Successfully fetched all completed items from given Party Name'
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                items,
+                'Successfully fetched all completed items from given Party Name'
+            )
         )
-    )
 
 })
 
 const getInitialItems = asyncHandler(async (req, res) => {
     const { partyName } = req.params;
 
-    if(!partyName){
+    if (!partyName) {
         throw new ApiError(400, 'No Party Name Provided')
     }
 
     const party = await getParty(partyName, req.user._id);
 
-    if(!party){
-        throw  new ApiError(404, 'No such Party Name exists under your account')
+    if (!party) {
+        throw new ApiError(404, 'No such Party Name exists under your account')
     }
 
     const items = await Item.aggregate(
         [
             {
                 $match: {
-                    partyId : party?._id
+                    partyId: party?._id
                 }
             },
             {
@@ -616,21 +550,73 @@ const getInitialItems = asyncHandler(async (req, res) => {
         ]
     )
 
-    if(!items?.length){
-        throw new ApiError(404,'No Items on given Party Name Found')
+    if (!items?.length) {
+        throw new ApiError(404, 'No Items on given Party Name Found')
     }
 
     return res
-    .status(200)
-    .json(
-        new ApiResponce(
-            200,
-            items,
-            'Successfully fetched all initial items from given Party Name'
+        .status(200)
+        .json(
+            new ApiResponce(
+                200,
+                items,
+                'Successfully fetched all initial items from given Party Name'
+            )
         )
-    )
 
 })
+const updateQuantityArrived = asyncHandler(async (req, res) => {
+    const { itemId } = req.params;
+
+    if (!itemId) {
+        throw new ApiError(400, 'No Item ID Provided')
+    }
+
+    const quantityArrived = Number(req.body.quantityArrived);
+
+    if (isNaN(quantityArrived) || quantityArrived < 0) {
+        throw new ApiError(400, 'Quantity arrived must be a non-negative number')
+    }
+
+    const item = await Item.findById(itemId);
+    if (!item) {
+        throw new ApiError(404, 'Item not found')
+    }
+
+    // Ensure completed + rejected don't exceed new arrived value
+    if ((item.quantityCompleted || 0) + (item.quantityRejected || 0) > quantityArrived) {
+        throw new ApiError(400, `Cannot set quantityArrived below already processed quantity (${(item.quantityCompleted || 0) + (item.quantityRejected || 0)})`)
+    }
+
+    item.quantityArrived = quantityArrived;
+    await item.save();
+
+    return res.status(200).json(
+        new ApiResponce(200, item, 'Quantity Arrived updated successfully')
+    )
+})
+
+const updateItemName = asyncHandler(async (req, res) => {
+    const { itemId } = req.params;
+    const { itemName } = req.body;
+
+    if (!itemId) {
+        throw new ApiError(400, 'No Item ID Provided')
+    }
+
+    const item = await Item.findById(itemId);
+    if (!item) {
+        throw new ApiError(404, 'Item not found')
+    }
+
+    item.itemName = (itemName || "").trim();
+    await item.save();
+
+    return res.status(200).json(
+        new ApiResponce(200, item, 'Item Name updated successfully')
+    )
+})
+
 
 
 export {
@@ -638,15 +624,15 @@ export {
     addNewItem,
     itemCompleted,
     itemRejected,
-    updatePaymentReceived,
     updatePhotoOfItem,
     updateColor,
     updateSizeLength,
     updateSizeWidth,
     deleteItem,
-    updatePrice,
     getRejectedItems,
     getCompletedItems,
     getInitialItems,
-    updateOutgoingDate
+    updateOutgoingDate,
+    updateQuantityArrived,
+    updateItemName
 }

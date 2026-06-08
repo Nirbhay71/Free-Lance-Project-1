@@ -1,54 +1,55 @@
 import mongoose from "mongoose"
 
 const ItemSchema = new mongoose.Schema({
-    color : {
-        type : String,
-        enum : ["gold", "rose gold", "black"],
-        required : true,
+    itemName: {
+        type: String,
+        trim: true,
+        default: ""
     },
-    size_length : {
-        type : Number,
-        required : true,
+    color: {
+        type: String,
+        enum: ["gold", "rose gold", "black"],
+        required: true,
     },
-    size_width : {
-        type : Number,
-        required : true,
+    size_length: {
+        type: Number,
+        required: true,
     },
-    photo : {
-        type : String,
-        required : true,
+    size_width: {
+        type: Number,
+        required: true,
     },
-    paymentReceived : {
-        type : Number,
-        default : 0,
+    photo: {
+        type: String,
+        default: ""
     },
-    partyId : {
-        type : mongoose.Schema.Types.ObjectId,
-        ref : "Party",
-        required : true,
+    orderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Order",
     },
-    price : {
-        type : Number,
-        required : true,
+    partyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Party",
+        required: true,
     },
-    quantityArrived : {
-        type : Number,
-        default : 0,
-        required : true,
+    quantityArrived: {
+        type: Number,
+        default: 0,
+        required: true,
     },
-    quantityCompleted : {
-        type : Number,
-        default : 0,
-        required : true,
+    quantityCompleted: {
+        type: Number,
+        default: 0,
+        required: true,
     },
-    quantityRejected : {
-        type : Number,
-        default : 0,
-        required : true,
+    quantityRejected: {
+        type: Number,
+        default: 0,
+        required: true,
     },
-    outgoingDate : {
-        type : Date,
+    outgoingDate: {
+        type: Date,
     }
-},{timestamps:true})
+}, { timestamps: true })
 
 export const Item = mongoose.model('Item', ItemSchema)
