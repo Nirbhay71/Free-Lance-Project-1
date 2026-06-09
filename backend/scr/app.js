@@ -39,6 +39,17 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }))
 app.use(express.static("public"))
 app.use(cookieParser())
 
+// Response Timing Middleware
+app.use((req, res, next) => {
+    const start = performance.now();
+    res.on("finish", () => {
+        const end = performance.now();
+        const duration = (end - start).toFixed(0); // Rounded to nearest integer as per example
+        console.log(`[Full Backend Time] ${req.method} ${req.originalUrl} - ${duration} ms`);
+    });
+    next();
+});
+
 // Routes import
 import userRouter from "./routes/user.routes.js"
 import itemRouter from "./routes/item.routes.js"

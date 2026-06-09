@@ -359,6 +359,78 @@ const PartyDetails = ({ partyName, onBack }) => {
         }).from(reportRef.current).save();
     };
 
+    const handleDownloadReceipt = (order) => {
+        const orderItems = (order.items || []).map((item, idx) => {
+            const itemCost = order.price * (item.size_length * item.size_width) * (item.quantityArrived - (item.quantityRejected || 0));
+            return { ...item, idx: idx + 1, itemCost };
+        });
+        const totalCost = orderItems.reduce((sum, it) => sum + it.itemCost, 0);
+
+        const content = `
+            <div style="padding: 20px; background: white; color: black; font-size: 12px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="text-align: left;">
+                        <div style="font-weight: 700; text-transform: uppercase;">WORK REPORT : ${order.orderName || order._id.slice(-4)}</div>
+                        <div style="margin-top: 15px;">
+                            <div style="font-weight: 700;">Address</div>
+                            <div>Rajkot - 360003</div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; flex: 1; padding: 0 20px;">
+                        <h1 style="margin: 0; fontSize: 28px; fontWeight: 800; color: #333;">Name</h1>
+                    </div>
+                    <div style="text-align: right;">
+                        <div>${fmt(new Date())}</div>
+                        <div style="margin-top: 15px;">
+                            <div style="font-weight: 700;">Party</div>
+                            <div style="font-weight: 700; text-transform: uppercase;">${partyName}</div>
+                        </div>
+                    </div>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; marginTop: 20px; border: 1px solid #999;">
+                    <thead>
+                        <tr style="background: #f0f0f0;">
+                            <th style="border: 1px solid #999; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700;">Sr. No.</th>
+                            <th style="border: 1px solid #999; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700;">Item</th>
+                            <th style="border: 1px solid #999; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700;">Qty</th>
+                            <th style="border: 1px solid #999; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700;">Date</th>
+                            <th style="border: 1px solid #999; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700;">D. Qty</th>
+                            <th style="border: 1px solid #999; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700;">R. Qty</th>
+                            <th style="border: 1px solid #999; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700;">Rate</th>
+                            <th style="border: 1px solid #999; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${orderItems.map(item => `
+                            <tr>
+                                <td style="border: 1px solid #999; padding: 8px 4px; text-align: center;">${item.idx}</td>
+                                <td style="border: 1px solid #999; padding: 8px 8px; text-align: left;"><div style="font-weight: 700;">${item.itemName || "Unnamed Item"} - ${item.color}</div></td>
+                                <td style="border: 1px solid #999; padding: 8px 4px; text-align: center;">${item.quantityArrived}</td>
+                                <td style="border: 1px solid #999; padding: 8px 4px; text-align: center;">${formatDateOnly(item.outgoingDate)}</td>
+                                <td style="border: 1px solid #999; padding: 8px 4px; text-align: center;">${item.quantityCompleted}</td>
+                                <td style="border: 1px solid #999; padding: 8px 4px; text-align: center;">${item.quantityRejected}</td>
+                                <td style="border: 1px solid #999; padding: 8px 4px; text-align: center;">${order.price}</td>
+                                <td style="border: 1px solid #999; padding: 8px 8px; text-align: right;">${item.itemCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                        `).join("")}
+                        <tr style="font-weight: 800; background: #f9f9f9;">
+                            <td colspan="7" style="border: 1px solid #999; padding: 8px 8px; text-align: center;">Total</td>
+                            <td style="border: 1px solid #999; padding: 8px 8px; text-align: right;">${totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        html2pdf().set({
+            margin: [10, 10, 10, 10],
+            filename: `${partyName}_${order.orderName}_Receipt.pdf`,
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+        }).from(content).save();
+    };
+
     const toggleOrder = (id) => setExpandedOrders(prev => ({ ...prev, [id]: !prev[id] }));
 
     // ---- Render helpers ----
@@ -426,7 +498,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Order Price (₹)</label>
-                                    <input type="number" min="0" className="form-input" placeholder="Total price" value={orderPrice} onChange={e => setOrderPrice(Math.max(0, e.target.value))} />
+                                    <input type="number" min="0" step="any" className="form-input" placeholder="Total price" value={orderPrice} onChange={e => setOrderPrice(Math.max(0, e.target.value))} />
                                 </div>
                             </div>
 
@@ -451,9 +523,9 @@ const PartyDetails = ({ partyName, onBack }) => {
                                         <ColorPicker value={it.color} onChange={v => updateOrderItem(i, "color", v)} name={`color_${i}`} />
                                         {/* Dimensions + Qty */}
                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-                                            <input type="number" min="0" className="form-input" placeholder="Length" value={it.size_length} onChange={e => updateOrderItem(i, "size_length", Math.max(0, e.target.value))} style={{ height: "36px" }} />
-                                            <input type="number" min="0" className="form-input" placeholder="Width" value={it.size_width} onChange={e => updateOrderItem(i, "size_width", Math.max(0, e.target.value))} style={{ height: "36px" }} />
-                                            <input type="number" min="0" className="form-input" placeholder="Qty" value={it.quantityArrived} onChange={e => updateOrderItem(i, "quantityArrived", Math.max(0, Math.floor(e.target.value)))} style={{ height: "36px" }} />
+                                            <input type="number" min="0" step="any" className="form-input" placeholder="Length" value={it.size_length} onChange={e => updateOrderItem(i, "size_length", Math.max(0, e.target.value))} style={{ height: "36px" }} />
+                                            <input type="number" min="0" step="any" className="form-input" placeholder="Width" value={it.size_width} onChange={e => updateOrderItem(i, "size_width", Math.max(0, e.target.value))} style={{ height: "36px" }} />
+                                            <input type="number" min="0" step="any" className="form-input" placeholder="Qty" value={it.quantityArrived} onChange={e => updateOrderItem(i, "quantityArrived", Math.max(0, e.target.value))} style={{ height: "36px" }} />
                                         </div>
                                         {/* Optional Photo */}
                                         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -513,10 +585,19 @@ const PartyDetails = ({ partyName, onBack }) => {
                                         <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--accent-light)" }}>₹{order.totalPrice ?? 0}</div>
                                         <div style={{ fontSize: "11px", color: "var(--success)", fontWeight: "600" }}>₹{order.price}/sq.in</div>
                                     </div>
-                                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                                        <button onClick={e => { e.stopPropagation(); openEditOrder(order); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", padding: "4px" }}><Pencil size={15} /></button>
-                                        <button onClick={e => { e.stopPropagation(); handleDeleteOrder(order._id); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: "4px" }}><Trash2 size={15} /></button>
-                                        {expandedOrders[order._id] ? <ChevronUp size={16} color="var(--text-secondary)" /> : <ChevronDown size={16} color="var(--text-secondary)" />}
+                                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(order); }} className="btn btn-icon-only" style={{ width: "34px", height: "34px" }} title="Download Receipt">
+                                            <Download size={14} />
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); openEditOrder(order); }} className="btn btn-icon-only" style={{ width: "34px", height: "34px" }}>
+                                            <Pencil size={12} />
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteOrder(order._id); }} className="btn btn-icon-only" style={{ width: "34px", height: "34px", color: "var(--danger)" }}>
+                                            <Trash2 size={12} />
+                                        </button>
+                                        <div style={{ marginLeft: "4px", color: "var(--text-secondary)" }}>
+                                            {expandedOrders[order._id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -596,7 +677,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                         <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>Set Total Payment Received (₹)</label>
-                        <input type="number" min="0" className="form-input" placeholder="Amount in ₹" value={paymentInput} onChange={e => setPaymentInput(Math.max(0, e.target.value))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
+                        <input type="number" min="0" step="any" className="form-input" placeholder="Amount in ₹" value={paymentInput} onChange={e => setPaymentInput(Math.max(0, e.target.value))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
                     </div>
                     <div style={{ display: "flex", gap: "10px" }}>
                         <button className="btn btn-primary" style={{ flexGrow: 1, height: "44px" }} onClick={handlePaymentSubmit}>Save Payment</button>
@@ -625,7 +706,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                     {isEditing ? (
                                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                                                <input type="number" min="0" className="form-input" value={editingPayment.amount} onChange={e => setEditingPayment(p => ({ ...p, amount: e.target.value }))} style={{ height: "36px" }} />
+                                                <input type="number" min="0" step="any" className="form-input" value={editingPayment.amount} onChange={e => setEditingPayment(p => ({ ...p, amount: e.target.value }))} style={{ height: "36px" }} />
                                                 <input type="date" className="form-input" value={editingPayment.date.split("T")[0]} onChange={e => setEditingPayment(p => ({ ...p, date: e.target.value }))} style={{ height: "36px" }} />
                                             </div>
                                             <input className="form-input" placeholder="Note (optional)" value={editingPayment.note} onChange={e => setEditingPayment(p => ({ ...p, note: e.target.value }))} style={{ height: "36px" }} />
@@ -666,7 +747,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{completeModal.itemName || completeModal.color} · Arrived: {completeModal.quantityArrived} · Done so far: {completeModal.quantityCompleted}</div>
                         </div>
                     </div>
-                    <input type="number" min="1" className="form-input" placeholder="Units completed now" value={completeVal} onChange={e => setCompleteVal(Math.max(1, Math.floor(e.target.value)))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
+                    <input type="number" min="0" step="any" className="form-input" placeholder="Units completed now" value={completeVal} onChange={e => setCompleteVal(Math.max(0, e.target.value))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
                     <div style={{ display: "flex", gap: "10px" }}>
                         <button className="btn btn-primary" style={{ flexGrow: 1, height: "44px", background: "var(--success)", borderColor: "var(--success)" }} onClick={handleComplete}>Save</button>
                         <button className="btn btn-secondary" style={{ height: "44px", padding: "0 14px" }} onClick={() => setCompleteModal(null)}>Cancel</button>
@@ -684,7 +765,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{rejectModal.itemName || rejectModal.color} · Arrived: {rejectModal.quantityArrived} · Rejected so far: {rejectModal.quantityRejected}</div>
                         </div>
                     </div>
-                    <input type="number" min="1" className="form-input" placeholder="Units rejected now" value={rejectVal} onChange={e => setRejectVal(Math.max(1, Math.floor(e.target.value)))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
+                    <input type="number" min="0" step="any" className="form-input" placeholder="Units rejected now" value={rejectVal} onChange={e => setRejectVal(Math.max(0, e.target.value))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
                     <div style={{ display: "flex", gap: "10px" }}>
                         <button className="btn btn-danger" style={{ flexGrow: 1, height: "44px" }} onClick={handleReject}>Confirm Reject</button>
                         <button className="btn btn-secondary" style={{ height: "44px", padding: "0 14px" }} onClick={() => setRejectModal(null)}>Cancel</button>
@@ -743,14 +824,11 @@ const PartyDetails = ({ partyName, onBack }) => {
                                                         return;
                                                     }
                                                     if (Number(val) < 0) return;
-                                                    if (["quantityArrived", "quantityCompleted", "quantityRejected"].includes(row.f)) {
-                                                        setEditInputs(p => ({ ...p, [row.f]: Math.floor(val) }));
-                                                        return;
-                                                    }
                                                 }
                                                 setEditInputs(p => ({ ...p, [row.f]: val }));
                                             }}
                                             min={row.type === "number" ? 0 : undefined}
+                                            step={row.type === "number" ? "any" : undefined}
                                             style={{ height: "40px" }}
                                         />
                                     )
@@ -821,6 +899,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                             setEditOrderInputs(p => ({ ...p, [row.f]: val }));
                                         }}
                                         min={row.type === "number" ? 0 : undefined}
+                                        step={row.type === "number" ? "any" : undefined}
                                         style={{ height: "40px" }}
                                     />
                                 ) : (
