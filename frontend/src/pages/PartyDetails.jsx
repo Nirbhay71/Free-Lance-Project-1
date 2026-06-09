@@ -144,7 +144,7 @@ const PartyDetails = ({ partyName, onBack }) => {
         const val = Number(paymentInput);
         if (isNaN(val) || val < 0) { setError("Enter a valid amount."); return; }
         try {
-            const res = await API.post(`/parties/update-payment/${partyName}`, {
+            const res = await API.patch(`/parties/payment/${partyName}`, {
                 paymentReceived: val,
                 date: paymentDate,
                 note: paymentNote
