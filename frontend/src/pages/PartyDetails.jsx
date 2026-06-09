@@ -48,6 +48,9 @@ const PartyDetails = ({ partyName, onBack }) => {
     const [paymentSummary, setPaymentSummary] = useState({ totalOrderValue: 0, paymentReceived: 0, outstanding: 0 });
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [paymentInput, setPaymentInput] = useState("");
+    const [historyModalOpen, setHistoryModalOpen] = useState(false);
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [editingPayment, setEditingPayment] = useState(null); // { id, amount, date, note }
 
     // Add Order form
     const [showAddOrder, setShowAddOrder] = useState(false);
@@ -90,6 +93,12 @@ const PartyDetails = ({ partyName, onBack }) => {
         return `${h}:${m} ${ap} ${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
     };
 
+    const formatDateOnly = (d) => {
+        if (!d) return "";
+        const dt = new Date(d);
+        return `${String(dt.getDate()).padStart(2, "0")}-${String(dt.getMonth() + 1).padStart(2, "0")}-${dt.getFullYear()}`;
+    };
+
     const fetchOrders = async () => {
         try {
             setLoading(true);
@@ -115,7 +124,17 @@ const PartyDetails = ({ partyName, onBack }) => {
         } catch { }
     };
 
-    const fetchAll = () => { fetchOrders(); fetchPaymentSummary(); };
+    const fetchPaymentHistory = async () => {
+        try {
+            const res = await API.get(`/parties/all`); // Get all parties to find this one
+            if (res.data?.success) {
+                const party = res.data.data.find(p => p.partyName === partyName);
+                if (party) setPaymentHistory(party.paymentsHistory || []);
+            }
+        } catch { }
+    };
+
+    const fetchAll = () => { fetchOrders(); fetchPaymentSummary(); fetchPaymentHistory(); };
 
     useEffect(() => { fetchAll(); }, [partyName]);
 
@@ -128,14 +147,36 @@ const PartyDetails = ({ partyName, onBack }) => {
                 setSuccess("Payment recorded!");
                 setPaymentModalOpen(false);
                 setPaymentInput("");
-                fetchPaymentSummary();
+                fetchAll();
             }
         } catch (e) { setError(e.response?.data?.message || "Payment failed."); }
     };
 
+    const handleEditPaymentSubmit = async (paymentId, amount, date, note) => {
+        try {
+            const res = await API.patch(`/parties/payment/${partyName}/${paymentId}`, { amount, date, note });
+            if (res.data?.success) {
+                setSuccess("Payment updated!");
+                setEditingPayment(null);
+                fetchAll();
+            }
+        } catch (e) { setError(e.response?.data?.message || "Update failed."); }
+    };
+
+    const handleDeletePayment = async (paymentId) => {
+        if (!window.confirm("Delete this payment record?")) return;
+        try {
+            const res = await API.delete(`/parties/payment/${partyName}/${paymentId}`);
+            if (res.data?.success) {
+                setSuccess("Payment deleted!");
+                fetchAll();
+            }
+        } catch (e) { setError(e.response?.data?.message || "Deletion failed."); }
+    };
+
     const addOrderItem = () => setOrderItems(prev => [
-        ...prev,
-        { itemName: "", color: "gold", size_length: "", size_width: "", quantityArrived: "", photo: null, preview: null }
+        { itemName: "", color: "gold", size_length: "", size_width: "", quantityArrived: "", photo: null, preview: null },
+        ...prev
     ]);
 
     const removeOrderItem = (i) => setOrderItems(prev => prev.filter((_, idx) => idx !== i));
@@ -161,8 +202,8 @@ const PartyDetails = ({ partyName, onBack }) => {
         if (!orderName.trim() || !orderPrice) { setError("Order name and price are required."); return; }
         for (let i = 0; i < orderItems.length; i++) {
             const it = orderItems[i];
-            if (!it.color || !it.size_length || !it.size_width || !it.quantityArrived) {
-                setError(`Item ${i + 1}: color, length, width and quantity are required.`); return;
+            if (!it.color || !it.quantityArrived) {
+                setError(`Item ${i + 1}: color and quantity are required.`); return;
             }
         }
         try {
@@ -173,8 +214,8 @@ const PartyDetails = ({ partyName, onBack }) => {
             orderItems.forEach((it, i) => {
                 fd.append(`items[${i}][itemName]`, it.itemName || "");
                 fd.append(`items[${i}][color]`, it.color);
-                fd.append(`items[${i}][size_length]`, it.size_length);
-                fd.append(`items[${i}][size_width]`, it.size_width);
+                fd.append(`items[${i}][size_length]`, it.size_length || 1);
+                fd.append(`items[${i}][size_width]`, it.size_width || 1);
                 fd.append(`items[${i}][quantityArrived]`, it.quantityArrived);
                 if (it.photo) fd.append(`photo_${i}`, it.photo);
             });
@@ -349,9 +390,14 @@ const PartyDetails = ({ partyName, onBack }) => {
                 <div className="glass-panel" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <h3 style={{ margin: 0, fontSize: "14px", fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}>💰 Party Payment Summary</h3>
-                        <button onClick={() => { setPaymentModalOpen(true); setPaymentInput(String(paymentSummary.paymentReceived)); }} className="btn btn-primary" style={{ height: "34px", padding: "0 12px", fontSize: "12px" }}>
-                            <DollarSign size={13} /> Record Payment
-                        </button>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                            <button onClick={() => setHistoryModalOpen(true)} className="btn btn-secondary" style={{ height: "34px", padding: "0 12px", fontSize: "12px" }}>
+                                <Calendar size={13} /> Payment History
+                            </button>
+                            <button onClick={() => { setPaymentModalOpen(true); setPaymentInput(""); }} className="btn btn-primary" style={{ height: "34px", padding: "0 12px", fontSize: "12px" }}>
+                                <DollarSign size={13} /> Record Payment
+                            </button>
+                        </div>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                         {[
@@ -380,7 +426,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                                 </div>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">Order Price (₹)</label>
-                                    <input type="number" className="form-input" placeholder="Total price" value={orderPrice} onChange={e => setOrderPrice(e.target.value)} />
+                                    <input type="number" min="0" className="form-input" placeholder="Total price" value={orderPrice} onChange={e => setOrderPrice(Math.max(0, e.target.value))} />
                                 </div>
                             </div>
 
@@ -405,9 +451,9 @@ const PartyDetails = ({ partyName, onBack }) => {
                                         <ColorPicker value={it.color} onChange={v => updateOrderItem(i, "color", v)} name={`color_${i}`} />
                                         {/* Dimensions + Qty */}
                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-                                            <input type="number" className="form-input" placeholder="Length" value={it.size_length} onChange={e => updateOrderItem(i, "size_length", e.target.value)} style={{ height: "36px" }} />
-                                            <input type="number" className="form-input" placeholder="Width" value={it.size_width} onChange={e => updateOrderItem(i, "size_width", e.target.value)} style={{ height: "36px" }} />
-                                            <input type="number" className="form-input" placeholder="Qty" value={it.quantityArrived} onChange={e => updateOrderItem(i, "quantityArrived", e.target.value)} style={{ height: "36px" }} />
+                                            <input type="number" min="0" className="form-input" placeholder="Length" value={it.size_length} onChange={e => updateOrderItem(i, "size_length", Math.max(0, e.target.value))} style={{ height: "36px" }} />
+                                            <input type="number" min="0" className="form-input" placeholder="Width" value={it.size_width} onChange={e => updateOrderItem(i, "size_width", Math.max(0, e.target.value))} style={{ height: "36px" }} />
+                                            <input type="number" min="0" className="form-input" placeholder="Qty" value={it.quantityArrived} onChange={e => updateOrderItem(i, "quantityArrived", Math.max(0, Math.floor(e.target.value)))} style={{ height: "36px" }} />
                                         </div>
                                         {/* Optional Photo */}
                                         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -463,7 +509,10 @@ const PartyDetails = ({ partyName, onBack }) => {
                                             {order.items?.length || 0} item(s) · Created {fmt(order.createdAt)}
                                         </div>
                                     </div>
-                                    <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--accent-light)" }}>₹{order.totalPrice ?? order.price}</div>
+                                    <div style={{ textAlign: "right" }}>
+                                        <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--accent-light)" }}>₹{order.totalPrice ?? 0}</div>
+                                        <div style={{ fontSize: "11px", color: "var(--success)", fontWeight: "600" }}>₹{order.price}/sq.in</div>
+                                    </div>
                                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                                         <button onClick={e => { e.stopPropagation(); openEditOrder(order); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", padding: "4px" }}><Pencil size={15} /></button>
                                         <button onClick={e => { e.stopPropagation(); handleDeleteOrder(order._id); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: "4px" }}><Trash2 size={15} /></button>
@@ -547,11 +596,62 @@ const PartyDetails = ({ partyName, onBack }) => {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                         <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>Set Total Payment Received (₹)</label>
-                        <input type="number" className="form-input" placeholder="Amount in ₹" value={paymentInput} onChange={e => setPaymentInput(e.target.value)} autoFocus style={{ height: "48px", fontSize: "16px" }} />
+                        <input type="number" min="0" className="form-input" placeholder="Amount in ₹" value={paymentInput} onChange={e => setPaymentInput(Math.max(0, e.target.value))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
                     </div>
                     <div style={{ display: "flex", gap: "10px" }}>
                         <button className="btn btn-primary" style={{ flexGrow: 1, height: "44px" }} onClick={handlePaymentSubmit}>Save Payment</button>
                         <button className="btn btn-secondary" style={{ height: "44px", padding: "0 14px" }} onClick={() => setPaymentModalOpen(false)}>Cancel</button>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Payment History Modal */}
+            {historyModalOpen && (
+                <Modal onClose={() => setHistoryModalOpen(false)} maxW="500px">
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: "rgba(139,92,246,0.12)", border: "1.5px solid rgba(139,92,246,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}><Calendar size={20} color="var(--accent-light)" /></div>
+                        <div style={{ textAlign: "left" }}>
+                            <div style={{ fontSize: "15px", fontWeight: "700", fontFamily: "var(--font-heading)" }}>Payment History</div>
+                            <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>View and mange past payment records</div>
+                        </div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "10px" }}>
+                        {paymentHistory.length === 0 ? (
+                            <p style={{ textAlign: "center", color: "var(--text-secondary)", padding: "20px" }}>No historical records found.</p>
+                        ) : paymentHistory.slice().reverse().map(h => {
+                            const isEditing = editingPayment?.id === h._id;
+                            return (
+                                <div key={h._id} style={{ background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                                    {isEditing ? (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                                                <input type="number" min="0" className="form-input" value={editingPayment.amount} onChange={e => setEditingPayment(p => ({ ...p, amount: e.target.value }))} style={{ height: "36px" }} />
+                                                <input type="date" className="form-input" value={editingPayment.date.split("T")[0]} onChange={e => setEditingPayment(p => ({ ...p, date: e.target.value }))} style={{ height: "36px" }} />
+                                            </div>
+                                            <input className="form-input" placeholder="Note (optional)" value={editingPayment.note} onChange={e => setEditingPayment(p => ({ ...p, note: e.target.value }))} style={{ height: "36px" }} />
+                                            <div style={{ display: "flex", gap: "8px" }}>
+                                                <button className="btn btn-primary" style={{ height: "32px", flexGrow: 1, fontSize: "12px" }} onClick={() => handleEditPaymentSubmit(h._id, editingPayment.amount, editingPayment.date, editingPayment.note)}>Save</button>
+                                                <button className="btn btn-secondary" style={{ height: "32px", fontSize: "12px" }} onClick={() => setEditingPayment(null)}>Cancel</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                <div>
+                                                    <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--success)" }}>₹{h.amount}</div>
+                                                    <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{fmt(h.date)}</div>
+                                                </div>
+                                                <div style={{ display: "flex", gap: "6px" }}>
+                                                    <button onClick={() => setEditingPayment({ id: h._id, amount: h.amount, date: h.date, note: h.note })} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}><Pencil size={14} /></button>
+                                                    <button onClick={() => handleDeletePayment(h._id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)" }}><Trash2 size={14} /></button>
+                                                </div>
+                                            </div>
+                                            {h.note && <div style={{ fontSize: "12px", fontStyle: "italic", color: "var(--text-secondary)", borderTop: "1px solid rgba(0,0,0,0.05)", paddingTop: "4px" }}>{h.note}</div>}
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </Modal>
             )}
@@ -566,7 +666,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{completeModal.itemName || completeModal.color} · Arrived: {completeModal.quantityArrived} · Done so far: {completeModal.quantityCompleted}</div>
                         </div>
                     </div>
-                    <input type="number" className="form-input" placeholder="Units completed now" value={completeVal} onChange={e => setCompleteVal(e.target.value)} autoFocus style={{ height: "48px", fontSize: "16px" }} />
+                    <input type="number" min="1" className="form-input" placeholder="Units completed now" value={completeVal} onChange={e => setCompleteVal(Math.max(1, Math.floor(e.target.value)))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
                     <div style={{ display: "flex", gap: "10px" }}>
                         <button className="btn btn-primary" style={{ flexGrow: 1, height: "44px", background: "var(--success)", borderColor: "var(--success)" }} onClick={handleComplete}>Save</button>
                         <button className="btn btn-secondary" style={{ height: "44px", padding: "0 14px" }} onClick={() => setCompleteModal(null)}>Cancel</button>
@@ -584,7 +684,7 @@ const PartyDetails = ({ partyName, onBack }) => {
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{rejectModal.itemName || rejectModal.color} · Arrived: {rejectModal.quantityArrived} · Rejected so far: {rejectModal.quantityRejected}</div>
                         </div>
                     </div>
-                    <input type="number" className="form-input" placeholder="Units rejected now" value={rejectVal} onChange={e => setRejectVal(e.target.value)} autoFocus style={{ height: "48px", fontSize: "16px" }} />
+                    <input type="number" min="1" className="form-input" placeholder="Units rejected now" value={rejectVal} onChange={e => setRejectVal(Math.max(1, Math.floor(e.target.value)))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
                     <div style={{ display: "flex", gap: "10px" }}>
                         <button className="btn btn-danger" style={{ flexGrow: 1, height: "44px" }} onClick={handleReject}>Confirm Reject</button>
                         <button className="btn btn-secondary" style={{ height: "44px", padding: "0 14px" }} onClick={() => setRejectModal(null)}>Cancel</button>
@@ -636,8 +736,18 @@ const PartyDetails = ({ partyName, onBack }) => {
                                             className="form-input"
                                             value={row.f === "itemName" ? editInputs.itemName : editInputs[row.f]}
                                             onChange={e => {
-                                                let val = e.target.value;
-                                                if (row.type === "number") val = Math.max(0, val);
+                                                const val = e.target.value;
+                                                if (row.type === "number") {
+                                                    if (val === "") {
+                                                        setEditInputs(p => ({ ...p, [row.f]: "" }));
+                                                        return;
+                                                    }
+                                                    if (Number(val) < 0) return;
+                                                    if (["quantityArrived", "quantityCompleted", "quantityRejected"].includes(row.f)) {
+                                                        setEditInputs(p => ({ ...p, [row.f]: Math.floor(val) }));
+                                                        return;
+                                                    }
+                                                }
                                                 setEditInputs(p => ({ ...p, [row.f]: val }));
                                             }}
                                             min={row.type === "number" ? 0 : undefined}
@@ -700,8 +810,14 @@ const PartyDetails = ({ partyName, onBack }) => {
                                         className="form-input"
                                         value={editOrderInputs[row.f]}
                                         onChange={e => {
-                                            let val = e.target.value;
-                                            if (row.type === "number") val = Math.max(0, val);
+                                            const val = e.target.value;
+                                            if (row.type === "number") {
+                                                if (val === "") {
+                                                    setEditOrderInputs(p => ({ ...p, [row.f]: "" }));
+                                                    return;
+                                                }
+                                                if (Number(val) < 0) return;
+                                            }
                                             setEditOrderInputs(p => ({ ...p, [row.f]: val }));
                                         }}
                                         min={row.type === "number" ? 0 : undefined}
@@ -768,35 +884,63 @@ const PartyDetails = ({ partyName, onBack }) => {
                         {reportData && (
                             <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                                 <button onClick={handleDownloadPDF} className="btn btn-primary" style={{ height: "48px", fontSize: "15px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", background: "var(--accent-light)" }}><Download size={18} /> Download Full Report (PDF)</button>
-                                <div ref={reportRef} style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "24px", background: "white", borderRadius: "16px", boxShadow: "0 10px 30px rgba(0,0,0,0.05)", border: "1px solid var(--border-color)" }}>
-                                    <div style={{ textAlign: "left", fontSize: "14px", fontWeight: "700", color: "var(--accent-light)" }}>
-                                        Report Period: {new Date(2000, reportMonth - 1).toLocaleString("default", { month: "long" })} {reportYear}
-                                    </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                                        {[
-                                            { label: "Opening (Prev)", val: `₹${reportData.openingBalance || 0}`, border: "var(--text-muted)" },
-                                            { label: "Month Billing", val: `₹${reportData.totalCost || 0}`, border: "var(--accent-light)" },
-                                            { label: "Recvd (Month)", val: `₹${reportData.totalPaymentReceived || 0}`, border: "var(--success)" },
-                                            { label: "Outstanding", val: `₹${reportData.totalPaymentPending || 0}`, border: "var(--warning)", color: "var(--warning)" },
-                                        ].map(s => (
-                                            <div key={s.label} className="glass-panel" style={{ padding: "12px", borderLeft: `4px solid ${s.border}`, textAlign: "left" }}>
-                                                <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{s.label}</div>
-                                                <div style={{ fontSize: "18px", fontWeight: "800", marginTop: "4px", color: s.color }}>{s.val}</div>
+                                <div ref={reportRef} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "20px", background: "white", color: "black", fontSize: "12px", fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}>
+                                    {/* Header Section */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                        <div style={{ textAlign: "left" }}>
+                                            <div style={{ fontWeight: "700", textTransform: "uppercase" }}>WORK REPORT : 841</div>
+                                            <div style={{ marginTop: "15px" }}>
+                                                <div style={{ fontWeight: "700" }}>Address</div>
+                                                <div>Rajkot - 360003</div>
                                             </div>
-                                        ))}
-                                    </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                                        {[
-                                            { label: "Arrived", val: reportData.totalQuantityArrived },
-                                            { label: "Completed", val: reportData.totalQuantityCompleted, color: "var(--success)" },
-                                            { label: "Rejected", val: reportData.totalQuantityRejected, color: "var(--danger)" },
-                                            { label: "Pending", val: reportData.totalQuantityPending, color: "var(--warning)" },
-                                        ].map(s => (
-                                            <div key={s.label} className="glass-panel" style={{ padding: "10px", textAlign: "left" }}>
-                                                <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{s.label}</div>
-                                                <div style={{ fontSize: "16px", fontWeight: "700", color: s.color }}>{s.val} pcs</div>
+                                        </div>
+                                        <div style={{ textAlign: "center", flex: 1, padding: "0 20px" }}>
+                                            <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "800", color: "#333" }}>Name</h1>
+                                        </div>
+                                        <div style={{ textAlign: "right" }}>
+                                            <div>{fmt(new Date())}</div>
+                                            <div style={{ marginTop: "15px" }}>
+                                                <div style={{ fontWeight: "700" }}>Party</div>
+                                                <div style={{ fontWeight: "700", textTransform: "uppercase" }}>{partyName}</div>
                                             </div>
-                                        ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Table Section */}
+                                    <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "20px", border: "1px solid #999" }}>
+                                        <thead>
+                                            <tr style={{ background: "#f0f0f0" }}>
+                                                {["Sr. No.", "Item", "Qty", "Date", "D. Qty", "R. Qty", "Rate", "Amount"].map(h => (
+                                                    <th key={h} style={{ border: "1px solid #999", padding: "8px 4px", textAlign: "center", fontSize: "11px", fontWeight: "700" }}>{h}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {reportData.items?.map((item, idx) => (
+                                                <tr key={item._id}>
+                                                    <td style={{ border: "1px solid #999", padding: "8px 4px", textAlign: "center" }}>{idx + 1}</td>
+                                                    <td style={{ border: "1px solid #999", padding: "8px 8px", textAlign: "left" }}>
+                                                        <div style={{ fontWeight: "700" }}>{item.itemName || "Unnamed Item"} - {item.color}</div>
+                                                    </td>
+                                                    <td style={{ border: "1px solid #999", padding: "8px 4px", textAlign: "center" }}>{item.quantityArrived}</td>
+                                                    <td style={{ border: "1px solid #999", padding: "8px 4px", textAlign: "center" }}>{formatDateOnly(item.outgoingDate)}</td>
+                                                    <td style={{ border: "1px solid #999", padding: "8px 4px", textAlign: "center" }}>{item.quantityCompleted}</td>
+                                                    <td style={{ border: "1px solid #999", padding: "8px 4px", textAlign: "center" }}>{item.quantityRejected}</td>
+                                                    <td style={{ border: "1px solid #999", padding: "8px 4px", textAlign: "center" }}>{item.price}</td>
+                                                    <td style={{ border: "1px solid #999", padding: "8px 8px", textAlign: "right" }}>{item.itemCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                                </tr>
+                                            ))}
+                                            {/* Total Row */}
+                                            <tr style={{ fontWeight: "800", background: "#f9f9f9" }}>
+                                                <td colSpan="7" style={{ border: "1px solid #999", padding: "8px 8px", textAlign: "center" }}>Total</td>
+                                                <td style={{ border: "1px solid #999", padding: "8px 8px", textAlign: "right" }}>{reportData.totalCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    {/* Footer / Page Info (Optional, as per image) */}
+                                    <div style={{ marginTop: "auto", paddingTop: "20px", display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#666" }}>
+                                        <div>Page 1 of 1</div>
                                     </div>
                                 </div>
                             </div>

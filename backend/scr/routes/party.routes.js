@@ -8,7 +8,9 @@ import {
     generateReportSingleParty,
     generateReportAllParties,
     updatePartyPayment,
-    getPartyPaymentSummary
+    getPartyPaymentSummary,
+    editPartyPayment,
+    deletePartyPayment
 } from "../controllers/party.controllers.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js"
 
@@ -25,6 +27,7 @@ router.route("/total-price/:partyName").post(calculateTotalPrice)
 router.route("/report/single/:partyName").post(generateReportSingleParty)
 router.route("/report/all").post(generateReportAllParties)
 router.route("/payment/:partyName").patch(updatePartyPayment)
+router.route("/payment/:partyName/:paymentId").patch(editPartyPayment).delete(deletePartyPayment)
 router.route("/payment-summary/:partyName").get(getPartyPaymentSummary)
 
 export default router

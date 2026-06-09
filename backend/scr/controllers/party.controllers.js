@@ -254,6 +254,49 @@ const updatePartyPayment = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponce(200, party, "Party payment recorded successfully"))
 })
 
+const editPartyPayment = asyncHandler(async (req, res) => {
+    const { partyName, paymentId } = req.params;
+    const { amount, date, note } = req.body;
+    const party = await getParty(partyName, req.user._id);
+
+    const paymentIndex = party.paymentsHistory.findIndex(p => p._id.toString() === paymentId);
+    if (paymentIndex === -1) throw new ApiError(404, "Payment record not found");
+
+    const oldAmount = party.paymentsHistory[paymentIndex].amount;
+    const newAmount = Number(amount);
+    if (isNaN(newAmount) || newAmount < 0) throw new ApiError(400, "Valid non-negative amount is required");
+
+    // Update the record
+    party.paymentsHistory[paymentIndex].amount = newAmount;
+    if (date) party.paymentsHistory[paymentIndex].date = new Date(date);
+    if (note !== undefined) party.paymentsHistory[paymentIndex].note = note;
+
+    // Update total summary
+    party.paymentReceived = (party.paymentReceived || 0) - oldAmount + newAmount;
+
+    await party.save();
+    return res.status(200).json(new ApiResponce(200, party, "Payment record updated successfully"));
+})
+
+const deletePartyPayment = asyncHandler(async (req, res) => {
+    const { partyName, paymentId } = req.params;
+    const party = await getParty(partyName, req.user._id);
+
+    const paymentIndex = party.paymentsHistory.findIndex(p => p._id.toString() === paymentId);
+    if (paymentIndex === -1) throw new ApiError(404, "Payment record not found");
+
+    const oldAmount = party.paymentsHistory[paymentIndex].amount;
+
+    // Remove the record
+    party.paymentsHistory.splice(paymentIndex, 1);
+
+    // Update total summary
+    party.paymentReceived = (party.paymentReceived || 0) - oldAmount;
+
+    await party.save();
+    return res.status(200).json(new ApiResponce(200, party, "Payment record deleted successfully"));
+})
+
 const getPartyPaymentSummary = asyncHandler(async (req, res) => {
     const { partyName } = req.params;
     const party = await getParty(partyName, req.user._id);
@@ -287,5 +330,7 @@ export {
     generateReportSingleParty,
     generateReportAllParties,
     updatePartyPayment,
-    getPartyPaymentSummary
+    getPartyPaymentSummary,
+    editPartyPayment,
+    deletePartyPayment
 }
