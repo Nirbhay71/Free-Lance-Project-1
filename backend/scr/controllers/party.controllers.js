@@ -218,65 +218,49 @@ const generateReportAllParties = asyncHandler(async (req, res) => {
 
     const partyIds = parties.map(p => p._id);
 
-    // Performance Optimization: Use Aggregation to calculate all party stats in ONE go
-    const stats = await Item.aggregate([
-        { $match: { partyId: { $in: partyIds } } },
-        {
-            $lookup: {
-                from: "orders",
-                localField: "orderId",
-                foreignField: "_id",
-                as: "order"
-            }
-        },
-        { $unwind: "$order" },
-        {
-            $project: {
-                partyId: 1,
-                outgoingDate: 1,
-                quantityArrived: 1,
-                quantityRejected: { $ifNull: ["$quantityRejected", 0] },
-                price: "$order.price",
-                size_length: 1,
-                size_width: 1,
-                cost: {
-                    $multiply: [
-                        "$order.price",
-                        "$size_length",
-                        "$size_width",
-                        { $subtract: ["$quantityArrived", { $ifNull: ["$quantityRejected", 0] }] }
-                    ]
-                }
-            }
-        },
-        {
-            $group: {
-                _id: "$partyId",
-                previousBilling: {
-                    $sum: {
-                        $cond: [{ $lt: ["$outgoingDate", startDate] }, "$cost", 0]
-                    }
-                },
-                currentBilling: {
-                    $sum: {
-                        $cond: [
-                            { $and: [{ $gte: ["$outgoingDate", startDate] }, { $lt: ["$outgoingDate", endDate] }] },
-                            "$cost",
-                            0
-                        ]
-                    }
-                },
-                totalProcessed: { $sum: 1 }
-            }
-        }
+    // Bulk-fetch all relevant items for ALL parties in TWO queries (no N+1)
+    const [previousItems, currentItems] = await Promise.all([
+        Item.find({ partyId: { $in: partyIds }, outgoingDate: { $lt: startDate } }),
+        Item.find({ partyId: { $in: partyIds }, outgoingDate: { $gte: startDate, $lt: endDate } })
     ]);
+    console.log("[Record Count] Prev Items:", previousItems.length, "| Curr Items:", currentItems.length);
 
-    const statsMap = new Map(stats.map(s => [s._id.toString(), s]));
-    let grandTotalItemsProcessed = stats.reduce((sum, s) => sum + s.totalProcessed, 0);
+    // Collect all unique orderIds from both sets and fetch them in ONE query
+    const allOrderIds = [...new Set([
+        ...previousItems.map(i => i.orderId?.toString()).filter(Boolean),
+        ...currentItems.map(i => i.orderId?.toString()).filter(Boolean)
+    ])];
+    const orders = await Order.find({ _id: { $in: allOrderIds } });
+    const ordersMap = new Map(orders.map(o => [o._id.toString(), o]));
+
+    // Helper: sum billing for an array of items using the ordersMap
+    const sumBilling = (items) => items.reduce((sum, item) => {
+        const order = ordersMap.get(item.orderId?.toString());
+        const rate = order ? order.price : 0;
+        return sum + rate * (item.size_length * item.size_width) * (item.quantityArrived - (item.quantityRejected || 0));
+    }, 0);
+
+    // Group items by partyId for O(1) lookup per party
+    const prevByParty = new Map();
+    const currByParty = new Map();
+    previousItems.forEach(i => {
+        const pid = i.partyId.toString();
+        if (!prevByParty.has(pid)) prevByParty.set(pid, []);
+        prevByParty.get(pid).push(i);
+    });
+    currentItems.forEach(i => {
+        const pid = i.partyId.toString();
+        if (!currByParty.has(pid)) currByParty.set(pid, []);
+        currByParty.get(pid).push(i);
+    });
+
+    console.log("[Processed Records]", previousItems.length + currentItems.length);
 
     const reports = parties.map(party => {
-        const pId = party._id.toString();
-        const stat = statsMap.get(pId) || { previousBilling: 0, currentBilling: 0 };
+        const pid = party._id.toString();
+
+        const previousBilling = sumBilling(prevByParty.get(pid) || []);
+        const currentBilling = sumBilling(currByParty.get(pid) || []);
 
         const previousPayments = (party.paymentsHistory || [])
             .filter(p => new Date(p.date) < startDate)
@@ -286,27 +270,38 @@ const generateReportAllParties = asyncHandler(async (req, res) => {
             .filter(p => new Date(p.date) >= startDate && new Date(p.date) < endDate)
             .reduce((sum, p) => sum + p.amount, 0);
 
-        const openingBalance = Number((stat.previousBilling - previousPayments).toFixed(2));
-        const currentBilling = Number(stat.currentBilling.toFixed(2));
-        const closingBalance = Number((openingBalance + currentBilling - currentPayments).toFixed(2));
+        const openingBalance = Number((previousBilling - previousPayments).toFixed(2));
+        const curBilling = Number(currentBilling.toFixed(2));
+        const closingBalance = Number((openingBalance + curBilling - currentPayments).toFixed(2));
 
         return {
             partyName: party.partyName,
-            openingBalance: openingBalance !== 0 ? openingBalance : 0,
-            currentBilling,
-            currentPayments: Number(currentPayments.toFixed(2)),
-            closingBalance
+            openingBalance: openingBalance > 0 ? openingBalance : 0,
+            // Field names matched to what Reports.jsx reads
+            totalCost: curBilling,
+            paymentReceived: Number(currentPayments.toFixed(2)),
+            paymentPending: closingBalance > 0 ? closingBalance : 0,
+            totalRejectedCost: 0, // Not tracked at report-all level
+            totalQuantityPending: 0 // Not tracked at report-all level
         };
-    }).filter(r => r.currentBilling > 0 || r.currentPayments > 0 || r.openingBalance !== 0);
+    }).filter(r => r.totalCost > 0 || r.paymentReceived > 0 || r.openingBalance > 0);
 
-    console.log("[Processed Records]", grandTotalItemsProcessed);
+    // Build the wrapper response object that matches what Reports.jsx expects
+    const grandTotalCost = reports.reduce((sum, r) => sum + r.totalCost, 0);
+    const grandTotalPaymentPending = reports.reduce((sum, r) => sum + r.paymentPending, 0);
 
-    const responseData = new ApiResponce(200, reports, "All Parties Report generated successfully");
+    const responseData = new ApiResponce(200, {
+        parties: reports,
+        grandTotalCost: Number(grandTotalCost.toFixed(2)),
+        grandTotalPaymentPending: Number(grandTotalPaymentPending.toFixed(2)),
+        grandTotalRejectedCost: 0
+    }, "All Parties Report generated successfully");
 
     const serializationStart = performance.now();
-    JSON.stringify(responseData);
+    const payload = JSON.stringify(responseData);
     const serializationEnd = performance.now();
     console.log(`[JSON Serialization] ${(serializationEnd - serializationStart).toFixed(3)} ms`);
+    console.log("[Payload Size]", (Buffer.byteLength(payload) / 1024).toFixed(2), "KB");
 
     return res.status(200).json(responseData)
 })
