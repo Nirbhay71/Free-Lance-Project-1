@@ -16,7 +16,8 @@ const UserSchema = new mongoose.Schema({
         required: true,
         unique: true,
         lowercase: true,
-        trim: true
+        trim: true,
+        index: true  // Explicit: used in $or:[{username},{email}] filter during loginUser & registerUser
     },
     password: {
         type: String,

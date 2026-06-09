@@ -48,6 +48,8 @@ const PartyDetails = ({ partyName, onBack }) => {
     const [paymentSummary, setPaymentSummary] = useState({ totalOrderValue: 0, paymentReceived: 0, outstanding: 0 });
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [paymentInput, setPaymentInput] = useState("");
+    const [paymentNote, setPaymentNote] = useState("");
+    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
     const [historyModalOpen, setHistoryModalOpen] = useState(false);
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [editingPayment, setEditingPayment] = useState(null); // { id, amount, date, note }
@@ -142,11 +144,17 @@ const PartyDetails = ({ partyName, onBack }) => {
         const val = Number(paymentInput);
         if (isNaN(val) || val < 0) { setError("Enter a valid amount."); return; }
         try {
-            const res = await API.patch(`/parties/payment/${partyName}`, { paymentReceived: val });
+            const res = await API.post(`/parties/update-payment/${partyName}`, {
+                paymentReceived: val,
+                date: paymentDate,
+                note: paymentNote
+            });
             if (res.data?.success) {
                 setSuccess("Payment recorded!");
                 setPaymentModalOpen(false);
                 setPaymentInput("");
+                setPaymentNote("");
+                setPaymentDate(new Date().toISOString().split("T")[0]);
                 fetchAll();
             }
         } catch (e) { setError(e.response?.data?.message || "Payment failed."); }
@@ -473,9 +481,9 @@ const PartyDetails = ({ partyName, onBack }) => {
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                         {[
-                            { label: "Total Orders Value", val: `₹${paymentSummary.totalOrderValue || 0}`, color: "var(--accent-light)" },
-                            { label: "Payment Received", val: `₹${paymentSummary.paymentReceived || 0}`, color: "var(--success)" },
-                            { label: "Remaining Balance", val: `₹${paymentSummary.outstanding || 0}`, color: (paymentSummary.outstanding || 0) > 0 ? "var(--warning)" : "var(--success)" }
+                            { label: "Total Orders Value", val: `₹${Number(paymentSummary.totalOrderValue || 0).toFixed(2)}`, color: "var(--accent-light)" },
+                            { label: "Payment Received", val: `₹${Number(paymentSummary.paymentReceived || 0).toFixed(2)}`, color: "var(--success)" },
+                            { label: "Remaining Balance", val: `₹${Number(paymentSummary.outstanding || 0).toFixed(2)}`, color: (paymentSummary.outstanding || 0) > 0 ? "var(--warning)" : "var(--success)" }
                         ].map(s => (
                             <div key={s.label} style={{ background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", padding: "10px 12px", textAlign: "left" }}>
                                 <div style={{ fontSize: "10px", color: "var(--text-secondary)", marginBottom: "4px" }}>{s.label}</div>
@@ -675,9 +683,19 @@ const PartyDetails = ({ partyName, onBack }) => {
                         <span style={{ color: "var(--text-secondary)" }}>Currently Received</span>
                         <strong style={{ color: "var(--success)" }}>₹{paymentSummary.paymentReceived}</strong>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>Set Total Payment Received (₹)</label>
-                        <input type="number" min="0" step="any" className="form-input" placeholder="Amount in ₹" value={paymentInput} onChange={e => setPaymentInput(Math.max(0, e.target.value))} autoFocus style={{ height: "48px", fontSize: "16px" }} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>Payment Amount (₹)</label>
+                            <input type="number" min="0" step="any" className="form-input" placeholder="Amount in ₹" value={paymentInput} onChange={e => setPaymentInput(Math.max(0, e.target.value))} autoFocus style={{ height: "40px" }} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>Payment Date</label>
+                            <input type="date" className="form-input" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} style={{ height: "40px" }} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--text-secondary)", textAlign: "left" }}>Note (optional)</label>
+                            <input className="form-input" placeholder="e.g. Cash, GPay, Ref ID..." value={paymentNote} onChange={e => setPaymentNote(e.target.value)} style={{ height: "40px" }} />
+                        </div>
                     </div>
                     <div style={{ display: "flex", gap: "10px" }}>
                         <button className="btn btn-primary" style={{ flexGrow: 1, height: "44px" }} onClick={handlePaymentSubmit}>Save Payment</button>

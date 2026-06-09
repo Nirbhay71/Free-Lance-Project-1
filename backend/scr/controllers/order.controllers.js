@@ -136,21 +136,51 @@ const getOrdersByParty = asyncHandler(async (req, res) => {
     const party = await getParty(partyName, req.user._id);
 
     const orders = await Order.find({ partyId: party._id }).sort({ createdAt: -1 });
+    console.log("[Record Count] Orders:", orders.length);
 
-    // Fetch items for each order and compute totalPrice = rate × Σ(L×W×qty)
-    const ordersWithItems = await Promise.all(
-        orders.map(async (order) => {
-            const items = await Item.find({ orderId: order._id });
-            const totalPrice = items.reduce((sum, item) => {
-                return sum + order.price * (item.size_length * item.size_width) * item.quantityArrived;
-            }, 0);
-            return { ...order.toObject(), items, totalPrice };
-        })
-    );
+    if (orders.length === 0) {
+        return res.status(200).json(new ApiResponce(200, { orders: [], party }, "Orders fetched successfully"));
+    }
 
-    return res.status(200).json(
-        new ApiResponce(200, { orders: ordersWithItems, party }, "Orders fetched successfully")
-    )
+    // Performance Optimization: Batch fetch all items for all retrieved orders (Avoid N+1)
+    const orderIds = orders.map(o => o._id);
+    const allItems = await Item.find({ orderId: { $in: orderIds } });
+    console.log("[Record Count] Items:", allItems.length);
+
+    // Group items by orderId for O(1) lookup
+    const itemsByOrder = new Map();
+    allItems.forEach(item => {
+        const oid = item.orderId.toString();
+        if (!itemsByOrder.has(oid)) itemsByOrder.set(oid, []);
+        itemsByOrder.get(oid).push(item);
+    });
+
+    const ordersWithItems = orders.map(order => {
+        const items = itemsByOrder.get(order._id.toString()) || [];
+        // Calculate totalPrice = rate × Σ(L×W×qty)
+        const totalPrice = items.reduce((sum, item) => {
+            const area = (item.size_length || 0) * (item.size_width || 0);
+            return sum + (order.price || 0) * area * (item.quantityArrived || 0);
+        }, 0);
+
+        return {
+            ...order.toObject(),
+            items,
+            totalPrice: Number(totalPrice.toFixed(2)) // Enforce precision
+        };
+    });
+
+    console.log("[Processed Records]", orders.length + allItems.length);
+
+    const responseData = new ApiResponce(200, { orders: ordersWithItems, party }, "Orders fetched successfully");
+
+    const serializationStart = performance.now();
+    const payload = JSON.stringify(responseData);
+    const serializationEnd = performance.now();
+    console.log(`[JSON Serialization] ${(serializationEnd - serializationStart).toFixed(3)} ms`);
+    console.log("[Payload Size]", (Buffer.byteLength(payload) / 1024).toFixed(2), "KB");
+
+    return res.status(200).json(responseData)
 })
 
 // Delete an order and all its items
